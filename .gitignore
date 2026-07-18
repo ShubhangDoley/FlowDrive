@@ -1,0 +1,11 @@
+# Local backend configuration and runtime state
+backend/.env
+backend/.venv/
+backend/__pycache__/
+backend/**/*.pyc
+backend/.pytest_cache/
+backend/flowdrive.db
+
+# Frontend local settings
+frontend/.env
+
