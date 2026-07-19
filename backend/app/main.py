@@ -10,6 +10,8 @@ Startup:
   - Start APScheduler for temp-file cleanup
 """
 
+import os
+
 import structlog
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
@@ -24,6 +26,12 @@ from app.routes.files import router as files_router
 from app.services.cleanup_service import run_cleanup
 
 settings = get_settings()
+
+# ── Allow OAuth over plain HTTP in local dev ──────────────────────────────────
+# google-auth-oauthlib raises InsecureTransportError when redirect_uri uses
+# http:// unless this env var is set. Never set in production.
+if not settings.is_production:
+    os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
 
 # ── Configure logging before anything else ────────────────────────────────────
 configure_logging(is_production=settings.is_production)

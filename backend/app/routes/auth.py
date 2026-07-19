@@ -66,7 +66,7 @@ def google_callback(
             status_code=status.HTTP_302_FOUND,
         )
     except Exception as exc:
-        logger.error("oauth_callback_error", error=str(exc))
+        logger.error("oauth_callback_error", error=str(exc), exc_info=True)
         return RedirectResponse(
             url=f"{settings.frontend_url}/login?error=server_error",
             status_code=status.HTTP_302_FOUND,

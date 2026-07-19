@@ -54,18 +54,32 @@ def _build_flow() -> Flow:
 def get_google_auth_url(session: dict) -> str:
     """
     Generate a Google OAuth redirect URL.
-    Stores a CSRF state token in the session for validation in the callback.
+    Stores a CSRF state token and PKCE code_verifier in the session
+    for validation in the callback.
     Returns the URL to redirect the user to.
     """
+    import secrets as _secrets
+    import hashlib, base64
+
     flow = _build_flow()
-    state = secrets.token_urlsafe(32)
+    state = _secrets.token_urlsafe(32)
     session["oauth_state"] = state
 
+    # Generate PKCE code_verifier and store it so callback can use it
+    code_verifier = _secrets.token_urlsafe(96)  # 128 URL-safe chars
+    session["oauth_code_verifier"] = code_verifier
+
+    # Compute code_challenge (S256)
+    digest = hashlib.sha256(code_verifier.encode()).digest()
+    code_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+
     auth_url, _ = flow.authorization_url(
-        access_type="offline",     # Request a refresh token
-        prompt="consent",          # Always show consent screen (to get refresh token)
+        access_type="offline",
+        prompt="consent",
         state=state,
         include_granted_scopes="true",
+        code_challenge=code_challenge,
+        code_challenge_method="S256",
     )
     logger.info("google_auth_url_generated")
     return auth_url
@@ -96,9 +110,12 @@ def handle_callback(
     if not stored_state or stored_state != state:
         raise ValueError("Invalid OAuth state. Possible CSRF attack.")
 
+    # Retrieve stored PKCE verifier (must match what was sent in the auth URL)
+    code_verifier = session.pop("oauth_code_verifier", None)
+
     # 2. Exchange code for tokens
     flow = _build_flow()
-    flow.fetch_token(code=code)
+    flow.fetch_token(code=code, code_verifier=code_verifier)
     credentials = flow.credentials
 
     if not credentials.refresh_token:
@@ -141,7 +158,7 @@ def handle_callback(
         user_id=user.id,
         encrypted_refresh=encrypted_refresh,
         access_token_expiry=expiry,
-        provider_metadata={"scopes": credentials.scopes},
+        provider_metadata={"scopes": list(credentials.scopes) if credentials.scopes else []},
     )
     logger.info("oauth_token_saved", user_id=str(user.id))
 
