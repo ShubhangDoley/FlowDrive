@@ -11,6 +11,7 @@ boto3==1.43.41
 cryptography==48.0.0
 APScheduler==3.11.3
 structlog==26.1.0
+passlib[bcrypt]>=1.7.4
 sentry-sdk[fastapi]==2.66.0
 itsdangerous==2.2.0
 pytest==8.4.2

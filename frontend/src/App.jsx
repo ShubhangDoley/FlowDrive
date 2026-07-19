@@ -14,6 +14,7 @@ import {
   Grid2X2,
   HardDrive,
   LayoutList,
+  Link,
   LogOut,
   MoreHorizontal,
   Plus,
@@ -92,63 +93,146 @@ const navigation = [
   { label: 'Temporary', icon: Archive, value: 'temporary' },
 ]
 
-// ─── Login page ───────────────────────────────────────────────────────────────
-function LoginPage() {
+// ─── Auth page (Sign In / Sign Up tabs) ──────────────────────────────────────
+function AuthPage({ onAuth }) {
+  const [tab, setTab] = useState('signin') // 'signin' | 'signup'
   const [loading, setLoading] = useState(false)
-  const params = new URLSearchParams(window.location.search)
-  const error = params.get('error')
+  const [error, setError] = useState('')
 
-  function handleLogin() {
+  // Sign in form
+  const [siUser, setSiUser] = useState('')
+  const [siPass, setSiPass] = useState('')
+
+  // Sign up form
+  const [suUsername, setSuUsername] = useState('')
+  const [suPass, setSuPass] = useState('')
+
+  const urlError = new URLSearchParams(window.location.search).get('error')
+
+  async function handleSignIn(e) {
+    e.preventDefault()
+    setError('')
     setLoading(true)
-    // Full redirect — Google will come back to /api/v1/auth/google/callback
-    window.location.href = '/api/v1/auth/google/login'
+    try {
+      const res = await API.post('/api/v1/auth/login', { username: siUser, password: siPass })
+      const data = await res.json()
+      if (!res.ok) { setError(data.detail ?? 'Login failed.'); return }
+      onAuth(data)
+    } catch { setError('Network error. Please try again.') }
+    finally { setLoading(false) }
   }
 
+  async function handleSignUp(e) {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const res = await API.post('/api/v1/auth/register', {
+        username: suUsername, password: suPass,
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.detail ?? 'Registration failed.'); return }
+      onAuth(data)
+    } catch { setError('Network error. Please try again.') }
+    finally { setLoading(false) }
+  }
+
+  const inputCls = 'h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100 transition'
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f7f8fa] px-4">
+    <main className="flex min-h-screen items-center justify-center bg-[#f7f8fa] px-4 py-10">
       <div className="w-full max-w-sm">
+        {/* Logo */}
         <div className="flex flex-col items-center text-center">
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1668e3] text-white shadow-lg">
             <Cloud size={28} strokeWidth={2.5} />
           </span>
-          <h1 className="mt-5 text-2xl font-bold tracking-tight text-slate-950">FlowDrive</h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Smart file storage — permanent on Google Drive, temporary on Cloudflare R2.
-          </p>
+          <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-950">FlowDrive</h1>
+          <p className="mt-1.5 text-sm text-slate-500">Smart cloud storage, your way.</p>
         </div>
 
-        {error && (
-          <div className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error === 'oauth_failed'
-              ? 'Google sign-in failed. Please try again.'
-              : 'Something went wrong. Please try again.'}
+        {/* URL error (from OAuth callback redirect) */}
+        {urlError && (
+          <div className="mt-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {urlError === 'oauth_failed' ? 'Google sign-in failed. Please try again.' : 'Something went wrong. Please try again.'}
           </div>
         )}
 
-        <div className="mt-8 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-          <button
-            id="btn-google-login"
-            className="flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:shadow disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={handleLogin}
-            disabled={loading}
-            type="button"
-          >
-            {loading ? (
-              <RefreshCw size={18} className="animate-spin text-slate-400" />
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-                <path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z" />
-                <path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.32-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z" />
-                <path fill="#FBBC05" d="M11.68 28.18A13.93 13.93 0 0 1 10.7 24c0-1.45.25-2.86.69-4.18v-5.7H4.34A23.93 23.93 0 0 0 0 24c0 3.88.93 7.55 2.56 10.81l7.12-5.52-.0 1.89z" />
-                <path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.34 5.7C13.42 14.62 18.27 10.75 24 10.75z" />
-              </svg>
-            )}
-            {loading ? 'Redirecting…' : 'Continue with Google'}
-          </button>
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
+          {/* Tabs */}
+          <div className="flex border-b border-slate-200">
+            {['signin', 'signup'].map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={`flex-1 py-3.5 text-sm font-semibold transition ${
+                  tab === t
+                    ? 'border-b-2 border-[#1668e3] text-[#1668e3]'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                onClick={() => { setTab(t); setError('') }}
+              >
+                {t === 'signin' ? 'Sign In' : 'Sign Up'}
+              </button>
+            ))}
+          </div>
 
-          <p className="mt-6 text-center text-xs text-slate-400">
-            By signing in you agree to FlowDrive storing your tokens securely.
-          </p>
+          <div className="p-6">
+            {/* Error */}
+            {error && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</div>
+            )}
+
+            {tab === 'signin' ? (
+              <form onSubmit={handleSignIn} className="space-y-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600" htmlFor="si-user">Username</label>
+                  <input id="si-user" className={inputCls} type="text" placeholder="your_username" autoComplete="username"
+                    value={siUser} onChange={e => setSiUser(e.target.value)} required />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600" htmlFor="si-pass">Password</label>
+                  <input id="si-pass" className={inputCls} type="password" placeholder="••••••••" autoComplete="current-password"
+                    value={siPass} onChange={e => setSiPass(e.target.value)} required />
+                </div>
+                <button
+                  id="btn-signin-submit"
+                  type="submit"
+                  disabled={loading}
+                  className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#1668e3] text-sm font-semibold text-white shadow-sm transition hover:bg-[#125bc7] disabled:opacity-60"
+                >
+                  {loading && <RefreshCw size={15} className="animate-spin" />}
+                  Sign In
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleSignUp} className="space-y-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600" htmlFor="su-username">Username</label>
+                  <input id="su-username" className={inputCls} type="text" placeholder="cool_username" autoComplete="username"
+                    value={suUsername} onChange={e => setSuUsername(e.target.value)} required pattern="[a-zA-Z0-9_]+" title="Letters, numbers, underscores only" />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600" htmlFor="su-pass">Password <span className="font-normal text-slate-400">(min 8 chars)</span></label>
+                  <input id="su-pass" className={inputCls} type="password" placeholder="••••••••" autoComplete="new-password"
+                    value={suPass} onChange={e => setSuPass(e.target.value)} required minLength={8} />
+                </div>
+                <button
+                  id="btn-signup-submit"
+                  type="submit"
+                  disabled={loading}
+                  className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#1668e3] text-sm font-semibold text-white shadow-sm transition hover:bg-[#125bc7] disabled:opacity-60"
+                >
+                  {loading && <RefreshCw size={15} className="animate-spin" />}
+                  Create Account
+                </button>
+              </form>
+            )}
+
+            <p className="mt-5 text-center text-xs text-slate-400">
+              By continuing you agree to FlowDrive's terms. Your account is stored securely.
+            </p>
+          </div>
         </div>
       </div>
     </main>
@@ -423,7 +507,12 @@ function Dashboard({ user, onLogout }) {
   useEffect(() => { fetchFiles() }, [fetchFiles])
 
   async function handleDelete(file) {
-    if (!confirm(`Delete "${file.filename}"? This cannot be undone.`)) return
+    const isPermanent = file.provider === 'google_drive'
+    const warningMsg = isPermanent
+      ? `Are you sure you want to delete "${file.filename}"? This action will also permanently delete the file from your Google Drive. This cannot be undone.`
+      : `Are you sure you want to delete "${file.filename}"? This action will also permanently delete the file from temporary storage. This cannot be undone.`
+
+    if (!confirm(warningMsg)) return
     const res = await API.delete(`/api/v1/files/${file.id}`)
     if (res.ok) fetchFiles()
     else alert('Delete failed. Please try again.')
@@ -455,6 +544,27 @@ function Dashboard({ user, onLogout }) {
 
   return (
     <main className="min-h-screen bg-[#f7f8fa] text-[#172033]">
+      {/* Drive connect banner */}
+      {!user.has_drive_connected && (
+        <div className="flex items-center justify-between gap-4 bg-amber-50 border-b border-amber-200 px-5 py-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+              <Link size={16} />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-amber-900">Connect Google Drive to upload permanent files</p>
+              <p className="text-xs text-amber-700">One-time setup — your files will be stored in your own Google Drive.</p>
+            </div>
+          </div>
+          <a
+            id="btn-connect-drive"
+            href="/api/v1/auth/google/connect"
+            className="shrink-0 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-600"
+          >
+            Connect Drive
+          </a>
+        </div>
+      )}
       {/* Header */}
       <header className="sticky top-0 z-20 flex h-16 items-center border-b border-slate-200 bg-white px-4 lg:px-7">
         <a className="flex items-center gap-2.5 font-semibold tracking-tight text-slate-950" href="#">
@@ -755,25 +865,120 @@ function Dashboard({ user, onLogout }) {
   )
 }
 
+// ─── Connect Google Page ──────────────────────────────────────────────────────
+function ConnectGooglePage({ user, onLogout }) {
+  const [loading, setLoading] = useState(false)
+
+  function handleConnect() {
+    setLoading(true)
+    window.location.href = '/api/v1/auth/google/connect'
+  }
+
+  async function handleLogoutClick() {
+    setLoading(true)
+    try {
+      await API.post('/api/v1/auth/logout')
+      onLogout()
+    } catch {
+      alert('Failed to log out.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#f7f8fa] px-4 py-10">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="flex flex-col items-center text-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1668e3] text-white shadow-lg">
+            <Cloud size={28} strokeWidth={2.5} />
+          </span>
+          <h1 className="mt-6 text-2xl font-bold tracking-tight text-slate-950">Link Google Drive</h1>
+          <p className="mt-2 text-sm text-slate-600">
+            Welcome to FlowDrive, <span className="font-semibold">{user.username}</span>! 
+            To store, view, and manage your permanent files, link your Google account.
+          </p>
+          <div className="mt-1 text-xs text-slate-400">
+            FlowDrive only requests access to files it creates.
+          </div>
+        </div>
+
+        <div className="mt-8 space-y-3">
+          <button
+            id="btn-connect-google"
+            type="button"
+            className="flex h-11 w-full items-center justify-center gap-3 rounded-lg bg-[#1668e3] text-sm font-semibold text-white shadow-md transition hover:bg-[#125bc7] hover:shadow-lg disabled:opacity-60 cursor-pointer"
+            onClick={handleConnect}
+            disabled={loading}
+          >
+            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#ffffff" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z" />
+              <path fill="#ffffff" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.32-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z" />
+              <path fill="#ffffff" d="M11.68 28.18A13.93 13.93 0 0 1 10.7 24c0-1.45.25-2.86.69-4.18v-5.7H4.34A23.93 23.93 0 0 0 0 24c0 3.88.93 7.55 2.56 10.81l7.12-5.52z" />
+              <path fill="#ffffff" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.34 5.7C13.42 14.62 18.27 10.75 24 10.75z" />
+            </svg>
+            Connect Google Account
+          </button>
+
+          <button
+            type="button"
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 cursor-pointer"
+            onClick={handleLogoutClick}
+            disabled={loading}
+          >
+            <LogOut size={16} />
+            Log Out
+          </button>
+        </div>
+      </div>
+    </main>
+  )
+}
+
 // ─── Root app — handles auth state ────────────────────────────────────────────
 export default function App() {
-  const [authState, setAuthState] = useState('loading') // 'loading' | 'unauthenticated' | 'authenticated'
+  const [authState, setAuthState] = useState('loading') // 'loading' | 'unauthenticated' | 'needs_drive' | 'authenticated'
   const [user, setUser] = useState(null)
 
   useEffect(() => {
     API.get('/api/v1/auth/me')
       .then(async (res) => {
         if (res.ok) {
-          setUser(await res.json())
-          setAuthState('authenticated')
-          // Clean up any ?error= from URL after successful auth
+          const userData = await res.json()
+          setUser(userData)
+          if (userData.has_drive_connected) {
+            setAuthState('authenticated')
+          } else {
+            setAuthState('needs_drive')
+          }
+          if (window.location.pathname !== '/') {
+            window.history.replaceState({}, '', '/')
+          }
           if (window.location.search) window.history.replaceState({}, '', window.location.pathname)
         } else {
           setAuthState('unauthenticated')
+          if (window.location.pathname !== '/') {
+            window.history.replaceState({}, '', '/')
+          }
         }
       })
-      .catch(() => setAuthState('unauthenticated'))
+      .catch(() => {
+        setAuthState('unauthenticated')
+        if (window.location.pathname !== '/') {
+          window.history.replaceState({}, '', '/')
+        }
+      })
   }, [])
+
+  function handleAuth(userData) {
+    setUser(userData)
+    if (userData.has_drive_connected) {
+      setAuthState('authenticated')
+    } else {
+      setAuthState('needs_drive')
+    }
+    if (window.location.search) window.history.replaceState({}, '', window.location.pathname)
+  }
 
   if (authState === 'loading') {
     return (
@@ -789,7 +994,16 @@ export default function App() {
   }
 
   if (authState === 'unauthenticated') {
-    return <LoginPage />
+    return <AuthPage onAuth={handleAuth} />
+  }
+
+  if (authState === 'needs_drive') {
+    return (
+      <ConnectGooglePage
+        user={user}
+        onLogout={() => { setUser(null); setAuthState('unauthenticated') }}
+      />
+    )
   }
 
   return (

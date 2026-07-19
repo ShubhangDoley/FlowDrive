@@ -8,7 +8,7 @@ like encrypted tokens, raw Google subjects, or database primary keys as strings.
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserRead(BaseModel):
@@ -17,9 +17,10 @@ class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    email: str
-    display_name: str | None
-    avatar_url: str | None
+    email: str | None = None
+    display_name: str | None = None
+    avatar_url: str | None = None
+    username: str | None = None
     # Computed on serialisation — True when an OAuthToken row exists for this user
     has_drive_connected: bool = False
 
@@ -28,3 +29,17 @@ class UserMe(UserRead):
     """Extended user info returned only on GET /auth/me (includes timestamps)."""
 
     created_at: datetime
+
+
+class RegisterRequest(BaseModel):
+    """Body for POST /auth/register."""
+
+    username: str = Field(min_length=3, max_length=64, pattern=r'^[a-zA-Z0-9_]+$')
+    password: str = Field(min_length=8, max_length=128)
+
+
+class LoginRequest(BaseModel):
+    """Body for POST /auth/login."""
+
+    username: str  # can be username OR email
+    password: str

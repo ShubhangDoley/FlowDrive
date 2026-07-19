@@ -14,18 +14,77 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
-from app.schemas.auth import UserMe
+from app.schemas.auth import LoginRequest, RegisterRequest, UserMe
 from app.services import auth_service
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
-@router.get("/google/login", summary="Start Google OAuth login")
+# ── Local auth ────────────────────────────────────────────────────────────────
+
+@router.post("/register", response_model=UserMe, status_code=status.HTTP_201_CREATED,
+             summary="Register with username + password")
+def register(
+    body: RegisterRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Create a new account. Sets the session cookie on success."""
+    try:
+        user = auth_service.register(
+            db,
+            username=body.username,
+            password=body.password,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+    request.session["user_id"] = str(user.id)
+    return auth_service.get_me(db, user)
+
+
+@router.post("/login", response_model=UserMe, summary="Login with username + password")
+def local_login(
+    body: LoginRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Authenticate with username/email + password. Sets the session cookie on success."""
+    try:
+        user = auth_service.login(
+            db,
+            username_or_email=body.username,
+            password=body.password,
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password.",
+        )
+
+    request.session["user_id"] = str(user.id)
+    return auth_service.get_me(db, user)
+
+
+# ── Google OAuth ──────────────────────────────────────────────────────────────
+
+@router.get("/google/login", summary="Start Google OAuth login (new accounts)")
 def google_login(request: Request):
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Direct Google sign-in is disabled. Please sign up or sign in using a username and password first."
+    )
+
+
+@router.get("/google/connect", summary="Connect Google Drive to existing account")
+def google_connect(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
     """
-    Redirect the user to Google's OAuth consent screen.
-    The CSRF state token is stored in the session before redirecting.
+    For already-logged-in users: start the Google OAuth flow to link Drive.
+    Stores the user_id in the session so the callback knows who to attach to.
     """
     settings = get_settings()
     if not settings.google_configured:
@@ -33,8 +92,9 @@ def google_login(request: Request):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Google OAuth is not configured on this server.",
         )
-
-    auth_url = auth_service.get_google_auth_url(request.session)
+    # Mark this as a drive-connect flow (not a fresh login)
+    request.session["connecting_drive_for"] = str(current_user.id)
+    auth_url = auth_service.get_drive_connect_url(request.session)
     return RedirectResponse(url=auth_url)
 
 
@@ -47,10 +107,10 @@ def google_callback(
 ):
     """
     Google redirects here after the user grants permission.
-    Validates state, exchanges the code, upserts the user, and sets the session.
-    Redirects to the frontend dashboard on success.
+    Handles both fresh login and Drive-connect flows.
     """
     settings = get_settings()
+    connecting_for = request.session.pop("connecting_drive_for", None)
 
     try:
         user = auth_service.handle_callback(
@@ -58,26 +118,25 @@ def google_callback(
             session=request.session,
             code=code,
             state=state,
+            attach_to_user_id=connecting_for,
         )
     except ValueError as exc:
         logger.warning("oauth_callback_failed", error=str(exc))
         return RedirectResponse(
-            url=f"{settings.frontend_url}/login?error=oauth_failed",
+            url=f"{settings.frontend_url}/?error=oauth_failed",
             status_code=status.HTTP_302_FOUND,
         )
     except Exception as exc:
         logger.error("oauth_callback_error", error=str(exc), exc_info=True)
         return RedirectResponse(
-            url=f"{settings.frontend_url}/login?error=server_error",
+            url=f"{settings.frontend_url}/?error=server_error",
             status_code=status.HTTP_302_FOUND,
         )
 
-    # Establish session
     request.session["user_id"] = str(user.id)
     logger.info("user_logged_in", user_id=str(user.id), email=user.email)
-
     return RedirectResponse(
-        url=f"{settings.frontend_url}/dashboard",
+        url=f"{settings.frontend_url}/",
         status_code=status.HTTP_302_FOUND,
     )
 

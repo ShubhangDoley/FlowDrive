@@ -35,6 +35,12 @@ def get_by_email(db: Session, email: str) -> User | None:
     return db.execute(stmt).scalar_one_or_none()
 
 
+def get_by_username(db: Session, username: str) -> User | None:
+    """Fetch a user by username."""
+    stmt = select(User).where(User.username == username)
+    return db.execute(stmt).scalar_one_or_none()
+
+
 def upsert(
     db: Session,
     *,
@@ -44,11 +50,17 @@ def upsert(
     avatar_url: str | None = None,
 ) -> User:
     """
-    Create a new User or update an existing one matched by google_sub.
-    Always updates display_name and avatar_url to reflect the latest Google profile.
+    Create-or-update a user matched by google_sub.
+    Also handles the case where a password-based user later connects Drive:
+    if a user with the same email already exists (no google_sub), we attach
+    the google_sub to that existing account.
     Commits and refreshes the object before returning.
     """
     user = get_by_google_sub(db, google_sub)
+
+    if user is None:
+        # Check if a password-based user with this email already exists
+        user = get_by_email(db, email)
 
     if user is None:
         user = User(
@@ -59,12 +71,35 @@ def upsert(
         )
         db.add(user)
     else:
-        # Keep profile info fresh on every login
+        user.google_sub = google_sub
         user.email = email
-        user.display_name = display_name
-        user.avatar_url = avatar_url
+        if display_name:
+            user.display_name = display_name
+        if avatar_url:
+            user.avatar_url = avatar_url
         user.updated_at = datetime.now(timezone.utc)
 
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def create_local(
+    db: Session,
+    *,
+    username: str,
+    email: str | None = None,
+    password_hash: str,
+    display_name: str | None = None,
+) -> User:
+    """Create a new user with username/password credentials."""
+    user = User(
+        username=username,
+        email=email,
+        password_hash=password_hash,
+        display_name=display_name or username,
+    )
+    db.add(user)
     db.commit()
     db.refresh(user)
     return user

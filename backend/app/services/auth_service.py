@@ -90,6 +90,7 @@ def handle_callback(
     session: dict,
     code: str,
     state: str,
+    attach_to_user_id: str | None = None,
 ) -> User:
     """
     Handle the OAuth callback after Google redirects the user back.
@@ -140,14 +141,39 @@ def handle_callback(
     display_name = id_info.get("name")
     avatar_url = id_info.get("picture")
 
-    # 4. Upsert the user
-    user = user_repo.upsert(
-        db,
-        google_sub=google_sub,
-        email=email,
-        display_name=display_name,
-        avatar_url=avatar_url,
-    )
+    # 4. Upsert the user (or attach Google to an existing password-based account)
+    if attach_to_user_id:
+        # Drive-connect flow: attach Google credentials to the existing user
+        user = user_repo.get_by_id(db, attach_to_user_id)
+        if user is None:
+            raise ValueError("User not found for drive connect.")
+        
+        # Prevent linking if this Google account is already in use by another user
+        existing_sub = user_repo.get_by_google_sub(db, google_sub)
+        if existing_sub and existing_sub.id != user.id:
+            raise ValueError("This Google account is already linked to another FlowDrive user.")
+        
+        existing_email = user_repo.get_by_email(db, email)
+        if existing_email and existing_email.id != user.id:
+            raise ValueError("This email address is already in use by another user.")
+
+        user.google_sub = google_sub
+        user.email = email
+        if display_name and (not user.display_name or user.display_name == user.username):
+            user.display_name = display_name
+        if not user.avatar_url and avatar_url:
+            user.avatar_url = avatar_url
+        user.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(user)
+    else:
+        user = user_repo.upsert(
+            db,
+            google_sub=google_sub,
+            email=email,
+            display_name=display_name,
+            avatar_url=avatar_url,
+        )
     logger.info("user_upserted", user_id=str(user.id), email=email)
 
     # 5. Encrypt and save the refresh token
@@ -183,6 +209,74 @@ def get_me(db: Session, user: User) -> UserMe:
         email=user.email,
         display_name=user.display_name,
         avatar_url=user.avatar_url,
+        username=user.username,
         has_drive_connected=token is not None,
         created_at=user.created_at,
     )
+
+
+def register(
+    db: Session,
+    *,
+    username: str,
+    password: str,
+) -> User:
+    """
+    Register a new user with username + password.
+    Raises ValueError on duplicate username.
+    """
+    from passlib.context import CryptContext
+
+    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+    if user_repo.get_by_username(db, username):
+        raise ValueError(f"Username '{username}' is already taken.")
+
+    password_hash = pwd_ctx.hash(password)
+    user = user_repo.create_local(
+        db,
+        username=username,
+        email=None,
+        password_hash=password_hash,
+        display_name=username,
+    )
+    logger.info("user_registered", user_id=str(user.id), username=username)
+    return user
+
+
+def login(
+    db: Session,
+    *,
+    username_or_email: str,
+    password: str,
+) -> User:
+    """
+    Authenticate a user by username (or email) + password.
+    Raises ValueError if credentials are invalid.
+    """
+    from passlib.context import CryptContext
+
+    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+    # Allow login with either username or email
+    if "@" in username_or_email:
+        user = user_repo.get_by_email(db, username_or_email)
+    else:
+        user = user_repo.get_by_username(db, username_or_email)
+
+    if not user or not user.password_hash:
+        raise ValueError("Invalid credentials.")
+
+    if not pwd_ctx.verify(password, user.password_hash):
+        raise ValueError("Invalid credentials.")
+
+    logger.info("user_logged_in_local", user_id=str(user.id))
+    return user
+
+
+def get_drive_connect_url(session: dict) -> str:
+    """
+    Build a Google OAuth URL for connecting Drive to an already-authenticated user.
+    Identical to get_google_auth_url but called when user is already logged in.
+    """
+    return get_google_auth_url(session)

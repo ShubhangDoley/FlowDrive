@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_completed_user
 from app.models.file import FileIntent
 from app.models.user import User
 from app.schemas.file import FileListResponse, FileRead, FileUploadResponse
@@ -34,7 +34,7 @@ async def upload_file(
         None, description="Required for temporary uploads: 1, 24, or 168"
     ),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_completed_user),
 ):
     """
     Upload a file.
@@ -58,7 +58,7 @@ async def upload_file(
 def list_files(
     intent: FileIntent | None = Query(None, description="Filter by 'permanent' or 'temporary'"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_completed_user),
 ):
     """Return all files owned by the authenticated user."""
     return file_service.list_files(db=db, user=current_user, intent_filter=intent)
@@ -71,7 +71,7 @@ def list_files(
 def download_file(
     file_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_completed_user),
 ):
     """
     Stream the file content.
@@ -100,7 +100,7 @@ def download_file(
 def delete_file(
     file_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_completed_user),
 ):
     """
     Delete a file from storage and remove its metadata.
