@@ -55,6 +55,14 @@ class File(UUIDPrimaryKey, Timestamps, Base):
     # Drive file ID (for google_drive) or object key (for cloudflare_r2)
     provider_obj_id: Mapped[str] = mapped_column(Text, nullable=False)
 
+    # Linked drive account (for google_drive files)
+    drive_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("drive_accounts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Upload intent
     intent: Mapped[FileIntent] = mapped_column(_intent_enum, nullable=False, index=True)
     # NULL for permanent files; set for temporary files
@@ -64,6 +72,7 @@ class File(UUIDPrimaryKey, Timestamps, Base):
 
     # Relationships
     owner: Mapped["User"] = relationship("User", back_populates="files")  # noqa: F821
+    drive_account: Mapped["DriveAccount | None"] = relationship("DriveAccount", back_populates="files")  # noqa: F821
 
     def __repr__(self) -> str:
         return f"<File id={self.id} name={self.filename!r} intent={self.intent}>"

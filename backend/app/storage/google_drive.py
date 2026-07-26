@@ -7,12 +7,15 @@ This folder is created on first login and reused on subsequent uploads.
 Scope used: https://www.googleapis.com/auth/drive.file
   → FlowDrive can only read/write files IT created (least-privilege).
 
-Token refresh is handled automatically by the google-auth library.
+Token refresh is handled automatically by the google-auth library with connection retries.
 """
 
 import io
+import time
 from collections.abc import Generator
 
+import requests
+from urllib3.util.retry import Retry
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
@@ -26,8 +29,21 @@ DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 CHUNK_SIZE = 8 * 1024 * 1024  # 8 MB
 
 
+def _get_http_request() -> Request:
+    """Return a google-auth Request configured with TCP connection retries."""
+    session = requests.Session()
+    retries = Retry(
+        total=5,
+        backoff_factor=0.5,
+        status_forcelist=[429, 500, 502, 503, 504],
+        raise_on_status=False,
+    )
+    session.mount("https://", requests.adapters.HTTPAdapter(max_retries=retries))
+    return Request(session=session)
+
+
 def _build_credentials(refresh_token: str) -> Credentials:
-    """Build a Credentials object from a refresh token. Refreshes automatically."""
+    """Build a Credentials object from a refresh token with exponential backoff retries."""
     settings = get_settings()
     creds = Credentials(
         token=None,
@@ -37,8 +53,20 @@ def _build_credentials(refresh_token: str) -> Credentials:
         client_secret=settings.google_client_secret,
         scopes=DRIVE_SCOPES,
     )
-    # Force a refresh to get a valid access token immediately
-    creds.refresh(Request())
+    req = _get_http_request()
+
+    last_exc = None
+    for attempt in range(3):
+        try:
+            creds.refresh(req)
+            return creds
+        except Exception as exc:
+            last_exc = exc
+            if attempt < 2:
+                time.sleep(0.5 * (2 ** attempt))
+
+    if last_exc:
+        raise last_exc
     return creds
 
 
@@ -105,6 +133,7 @@ class GoogleDriveStorage(StorageAdapter):
         """
         Upload a file to the user's FlowDrive folder in Google Drive.
         Returns the Drive file ID as provider_obj_id.
+        Includes retry logic for transient socket resets.
         """
         settings = get_settings()
         if folder_id is None:
@@ -118,14 +147,23 @@ class GoogleDriveStorage(StorageAdapter):
             resumable=True,
         )
 
-        try:
-            drive_file = (
-                self._service.files()
-                .create(body=metadata, media_body=media, fields="id,size,mimeType")
-                .execute()
-            )
-        except HttpError as exc:
-            raise StorageError(f"Drive upload failed: {exc}") from exc
+        drive_file = None
+        last_exc = None
+        for attempt in range(3):
+            try:
+                drive_file = (
+                    self._service.files()
+                    .create(body=metadata, media_body=media, fields="id,size,mimeType")
+                    .execute()
+                )
+                break
+            except (HttpError, OSError, ConnectionError, Exception) as exc:
+                last_exc = exc
+                if attempt < 2:
+                    time.sleep(1.0 * (2 ** attempt))
+
+        if not drive_file:
+            raise StorageError(f"Drive upload failed: {last_exc}")
 
         size_bytes = int(drive_file.get("size", 0)) or None
         return UploadResult(

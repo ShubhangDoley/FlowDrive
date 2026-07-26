@@ -21,8 +21,8 @@ class UserRead(BaseModel):
     display_name: str | None = None
     avatar_url: str | None = None
     username: str | None = None
-    # Computed on serialisation — True when an OAuthToken row exists for this user
     has_drive_connected: bool = False
+    drive_account_count: int = 0
 
 
 class UserMe(UserRead):

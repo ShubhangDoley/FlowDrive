@@ -5,7 +5,18 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FlowDrive — Smart Cloud Storage</title>
-  <meta name="description" content="FlowDrive: store files permanently on Google Drive or temporarily on Cloudflare R2 with auto-expiry." />
+    <meta name="description" content="FlowDrive: store files permanently on Google Drive or temporarily on Cloudflare R2 with auto-expiry." />
+
+    <!-- Critical inline CSS: sets bg at HTML parse time before any JS/CSS loads -->
+    <style>
+      html, body { margin: 0; padding: 0; min-height: 100vh; background: #F8F9FA; color: #202124; }
+      #root { min-height: 100vh; }
+    </style>
+
+    <!-- Fonts: DM Sans (closest Google Sans equivalent on Google Fonts) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>

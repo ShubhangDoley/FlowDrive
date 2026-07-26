@@ -8,7 +8,7 @@ The cleanup scheduler uses list_expired() to find files that need to be removed.
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, func
 from sqlalchemy.orm import Session
 
 from app.models.file import File, FileIntent, FileProvider
@@ -25,6 +25,7 @@ def create(
     mime_type: str | None = None,
     size_bytes: int | None = None,
     expires_at: datetime | None = None,
+    drive_account_id: uuid.UUID | None = None,
 ) -> File:
     """
     Persist a new file metadata record after a successful upload.
@@ -39,6 +40,7 @@ def create(
         provider_obj_id=provider_obj_id,
         intent=intent,
         expires_at=expires_at,
+        drive_account_id=drive_account_id,
     )
     db.add(file)
     db.commit()
@@ -98,3 +100,9 @@ def list_expired(db: Session) -> list[File]:
         )
     )
     return list(db.execute(stmt).scalars().all())
+
+
+def count_by_drive_account(db: Session, drive_account_id: uuid.UUID) -> int:
+    """Return count of files linked to a specific DriveAccount."""
+    stmt = select(func.count(File.id)).where(File.drive_account_id == drive_account_id)
+    return db.execute(stmt).scalar() or 0

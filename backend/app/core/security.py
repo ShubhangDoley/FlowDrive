@@ -94,14 +94,12 @@ async def get_completed_user(
     """
     FastAPI dependency — ensures the user has set up credentials AND connected Google Drive.
     """
-    from app.repositories.token_repo import get_by_user
     if not user.username:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Signup incomplete. Please set up a username and password."
         )
-    token = get_by_user(db, user.id)
-    if not token:
+    if not user.has_drive_connected:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Google Drive is not connected. Please connect it first."

@@ -15,8 +15,9 @@ settings = get_settings()
 engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,        # verify connection before use
-    pool_size=5,
-    max_overflow=10,
+    pool_size=20,              # increased capacity for concurrent uploads
+    max_overflow=30,           # allow temporary overflow under high load
+    pool_timeout=10,           # fast fail instead of hanging forever
     echo=not settings.is_production,  # log SQL in dev, silent in prod
 )
 

@@ -27,6 +27,8 @@ class FileRead(BaseModel):
     size_bytes: int | None
     provider: FileProvider
     intent: FileIntent
+    drive_account_id: uuid.UUID | None = None
+    drive_account_email: str | None = None
     expires_at: datetime | None
     created_at: datetime
 
@@ -64,6 +66,7 @@ class FileUploadParams(BaseModel):
 
     intent: FileIntent
     expiry_hours: int | None = None
+    drive_account_id: uuid.UUID | None = None
 
     @field_validator("expiry_hours")
     @classmethod

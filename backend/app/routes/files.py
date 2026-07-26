@@ -5,6 +5,7 @@ All endpoints require an authenticated session (via get_current_user).
 Large file downloads are streamed to avoid buffering the whole file in memory.
 """
 
+import uuid
 import structlog
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -27,11 +28,14 @@ router = APIRouter(prefix="/api/v1/files", tags=["files"])
     status_code=status.HTTP_201_CREATED,
     summary="Upload a file",
 )
-async def upload_file(
+def upload_file(
     upload: UploadFile = File(..., description="The file to upload"),
     intent: FileIntent = Form(..., description="'permanent' (Drive) or 'temporary' (R2)"),
     expiry_hours: int | None = Form(
         None, description="Required for temporary uploads: 1, 24, or 168"
+    ),
+    drive_account_id: uuid.UUID | None = Form(
+        None, description="Optional target Drive account ID for permanent uploads"
     ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_completed_user),
@@ -41,12 +45,13 @@ async def upload_file(
     - `intent=permanent` → stored in Google Drive (no expiry)
     - `intent=temporary` → stored in Cloudflare R2, expires after `expiry_hours`
     """
-    return await file_service.upload_file(
+    return file_service.upload_file(
         db=db,
         user=current_user,
         upload=upload,
         intent=intent,
         expiry_hours=expiry_hours,
+        drive_account_id=drive_account_id,
     )
 
 

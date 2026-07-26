@@ -1,1015 +1,1282 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Archive,
-  Bell,
-  ChevronDown,
-  Cloud,
-  CloudUpload,
-  Download,
-  FileArchive,
-  FileImage,
-  FileSpreadsheet,
-  FileText,
-  FolderOpen,
-  Grid2X2,
-  HardDrive,
-  LayoutList,
-  Link,
-  LogOut,
-  MoreHorizontal,
-  Plus,
-  RefreshCw,
-  Search,
-  Trash2,
-  Upload,
-  X,
-} from 'lucide-react'
+  Cloud, LogOut, Upload, File as FileIcon,
+  Download, Trash2, Clock, RefreshCw, Search, X, Plus, HardDrive, Check, AlertCircle, Zap
+} from 'lucide-react';
 
 // ─── API helper ───────────────────────────────────────────────────────────────
-// All requests go through the Vite proxy → http://127.0.0.1:8000
 const API = {
-  get: (path) => fetch(path, { credentials: 'include' }),
-  post: (path, body) =>
-    fetch(path, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }),
-  postForm: (path, formData) =>
-    fetch(path, { method: 'POST', credentials: 'include', body: formData }),
-  delete: (path) =>
-    fetch(path, { method: 'DELETE', credentials: 'include' }),
-}
+  get:      (path)           => fetch(path, { credentials: 'include' }),
+  post:     (path, body)     => fetch(path, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  postForm: (path, formData) => fetch(path, { method: 'POST', credentials: 'include', body: formData }),
+  postFormWithProgress: (path, formData, onProgress, onRegisterAbort) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', path);
+      xhr.withCredentials = true;
 
-// ─── File icon helper ─────────────────────────────────────────────────────────
-function fileIcon(filename, provider) {
-  if (provider === 'cloudflare_r2') return { Icon: Archive, tone: 'text-orange-600 bg-orange-50' }
-  const ext = filename?.split('.').pop()?.toLowerCase()
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext))
-    return { Icon: FileImage, tone: 'text-fuchsia-600 bg-fuchsia-50' }
-  if (['xls', 'xlsx', 'csv'].includes(ext))
-    return { Icon: FileSpreadsheet, tone: 'text-emerald-600 bg-emerald-50' }
-  if (['zip', 'tar', 'gz', 'rar', '7z'].includes(ext))
-    return { Icon: FileArchive, tone: 'text-amber-600 bg-amber-50' }
-  return { Icon: FileText, tone: 'text-blue-600 bg-blue-50' }
-}
+      if (onRegisterAbort) {
+        onRegisterAbort(() => xhr.abort());
+      }
 
+      if (xhr.upload && onProgress) {
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            onProgress(percent, event.loaded, event.total);
+          }
+        };
+      }
+
+      xhr.onload = () => {
+        let json = {};
+        try { json = JSON.parse(xhr.responseText || '{}'); } catch (e) {}
+        resolve({
+          ok: xhr.status >= 200 && xhr.status < 300,
+          status: xhr.status,
+          json: async () => json,
+        });
+      };
+
+      xhr.onerror = () => reject(new TypeError('Network request failed'));
+      xhr.onabort = () => reject(new Error('Upload cancelled by user'));
+      xhr.send(formData);
+    });
+  },
+  patch:    (path, body)     => fetch(path, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  delete:   (path)           => fetch(path, { method: 'DELETE', credentials: 'include' }),
+};
+
+// ─── Shared inline style constants ────────────────────────────────────────────
+const S = {
+  input: {
+    display: 'block', width: '100%', height: '40px', padding: '0 12px',
+    border: '1px solid #DADCE0', borderRadius: '8px',
+    fontSize: '14px', color: '#202124', background: '#FFFFFF',
+    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+    transition: 'border-color 0.15s',
+  },
+  btnPrimary: {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+    padding: '10px 20px', background: '#4285F4', color: '#FFFFFF',
+    border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600,
+    cursor: 'pointer', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
+    transition: 'background 0.15s',
+  },
+  btnOutline: {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+    padding: '10px 20px', background: '#FFFFFF', color: '#202124',
+    border: '1px solid #DADCE0', borderRadius: '8px', fontSize: '14px', fontWeight: 500,
+    cursor: 'pointer', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
+  },
+  btnIcon: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    padding: '6px', borderRadius: '6px', color: '#5F6368',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'background 0.15s',
+  },
+};
+
+// ─── Utility helpers ──────────────────────────────────────────────────────────
 function fmtBytes(bytes) {
-  if (!bytes) return '—'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  if (!bytes) return '—';
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
-function fmtDate(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  const now = new Date()
-  const diff = now - d
-  if (diff < 86400000) return 'Today'
-  if (diff < 172800000) return 'Yesterday'
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+function fmtDate(isoString) {
+  if (!isoString) return '—';
+  const date = new Date(isoString);
+  const now  = new Date();
+  const diff = now - date;
+  if (diff < 86400000)   return 'Today';
+  if (diff < 172800000)  return 'Yesterday';
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function fmtExpiry(iso) {
-  if (!iso) return null
-  const diff = new Date(iso) - new Date()
-  if (diff <= 0) return 'Expired'
-  const h = Math.floor(diff / 3600000)
-  if (h < 24) return `Expires in ${h}h`
-  return `Expires in ${Math.floor(h / 24)}d`
-}
-
-function userInitials(name, email) {
-  if (name) return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
-  return email?.slice(0, 2).toUpperCase() ?? '??'
-}
-
-// ─── Navigation ───────────────────────────────────────────────────────────────
-const navigation = [
-  { label: 'All files', icon: HardDrive, value: 'all' },
-  { label: 'Permanent', icon: Cloud, value: 'permanent' },
-  { label: 'Temporary', icon: Archive, value: 'temporary' },
-]
-
-// ─── Auth page (Sign In / Sign Up tabs) ──────────────────────────────────────
-function AuthPage({ onAuth }) {
-  const [tab, setTab] = useState('signin') // 'signin' | 'signup'
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  // Sign in form
-  const [siUser, setSiUser] = useState('')
-  const [siPass, setSiPass] = useState('')
-
-  // Sign up form
-  const [suUsername, setSuUsername] = useState('')
-  const [suPass, setSuPass] = useState('')
-
-  const urlError = new URLSearchParams(window.location.search).get('error')
-
-  async function handleSignIn(e) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-    try {
-      const res = await API.post('/api/v1/auth/login', { username: siUser, password: siPass })
-      const data = await res.json()
-      if (!res.ok) { setError(data.detail ?? 'Login failed.'); return }
-      onAuth(data)
-    } catch { setError('Network error. Please try again.') }
-    finally { setLoading(false) }
+function fmtExpiry(isoString) {
+  if (!isoString) return null;
+  const expiry  = new Date(isoString);
+  const now     = new Date();
+  const diffMs  = expiry - now;
+  if (diffMs <= 0) return 'Expired';
+  const diffHrs = diffMs / (1000 * 60 * 60);
+  if (diffHrs < 1) {
+    const mins = Math.floor(diffMs / (1000 * 60));
+    return `${mins}m left`;
   }
-
-  async function handleSignUp(e) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-    try {
-      const res = await API.post('/api/v1/auth/register', {
-        username: suUsername, password: suPass,
-      })
-      const data = await res.json()
-      if (!res.ok) { setError(data.detail ?? 'Registration failed.'); return }
-      onAuth(data)
-    } catch { setError('Network error. Please try again.') }
-    finally { setLoading(false) }
-  }
-
-  const inputCls = 'h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100 transition'
-
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f7f8fa] px-4 py-10">
-      <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="flex flex-col items-center text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1668e3] text-white shadow-lg">
-            <Cloud size={28} strokeWidth={2.5} />
-          </span>
-          <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-950">FlowDrive</h1>
-          <p className="mt-1.5 text-sm text-slate-500">Smart cloud storage, your way.</p>
-        </div>
-
-        {/* URL error (from OAuth callback redirect) */}
-        {urlError && (
-          <div className="mt-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {urlError === 'oauth_failed' ? 'Google sign-in failed. Please try again.' : 'Something went wrong. Please try again.'}
-          </div>
-        )}
-
-        <div className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
-          {/* Tabs */}
-          <div className="flex border-b border-slate-200">
-            {['signin', 'signup'].map((t) => (
-              <button
-                key={t}
-                type="button"
-                className={`flex-1 py-3.5 text-sm font-semibold transition ${
-                  tab === t
-                    ? 'border-b-2 border-[#1668e3] text-[#1668e3]'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-                onClick={() => { setTab(t); setError('') }}
-              >
-                {t === 'signin' ? 'Sign In' : 'Sign Up'}
-              </button>
-            ))}
-          </div>
-
-          <div className="p-6">
-            {/* Error */}
-            {error && (
-              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</div>
-            )}
-
-            {tab === 'signin' ? (
-              <form onSubmit={handleSignIn} className="space-y-3">
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-600" htmlFor="si-user">Username</label>
-                  <input id="si-user" className={inputCls} type="text" placeholder="your_username" autoComplete="username"
-                    value={siUser} onChange={e => setSiUser(e.target.value)} required />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-600" htmlFor="si-pass">Password</label>
-                  <input id="si-pass" className={inputCls} type="password" placeholder="••••••••" autoComplete="current-password"
-                    value={siPass} onChange={e => setSiPass(e.target.value)} required />
-                </div>
-                <button
-                  id="btn-signin-submit"
-                  type="submit"
-                  disabled={loading}
-                  className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#1668e3] text-sm font-semibold text-white shadow-sm transition hover:bg-[#125bc7] disabled:opacity-60"
-                >
-                  {loading && <RefreshCw size={15} className="animate-spin" />}
-                  Sign In
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleSignUp} className="space-y-3">
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-600" htmlFor="su-username">Username</label>
-                  <input id="su-username" className={inputCls} type="text" placeholder="cool_username" autoComplete="username"
-                    value={suUsername} onChange={e => setSuUsername(e.target.value)} required pattern="[a-zA-Z0-9_]+" title="Letters, numbers, underscores only" />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-600" htmlFor="su-pass">Password <span className="font-normal text-slate-400">(min 8 chars)</span></label>
-                  <input id="su-pass" className={inputCls} type="password" placeholder="••••••••" autoComplete="new-password"
-                    value={suPass} onChange={e => setSuPass(e.target.value)} required minLength={8} />
-                </div>
-                <button
-                  id="btn-signup-submit"
-                  type="submit"
-                  disabled={loading}
-                  className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#1668e3] text-sm font-semibold text-white shadow-sm transition hover:bg-[#125bc7] disabled:opacity-60"
-                >
-                  {loading && <RefreshCw size={15} className="animate-spin" />}
-                  Create Account
-                </button>
-              </form>
-            )}
-
-            <p className="mt-5 text-center text-xs text-slate-400">
-              By continuing you agree to FlowDrive's terms. Your account is stored securely.
-            </p>
-          </div>
-        </div>
-      </div>
-    </main>
-  )
+  return `${Math.floor(diffHrs)}h left`;
 }
 
-// ─── Upload modal ─────────────────────────────────────────────────────────────
-function UploadModal({ initialIntent, onClose, onSuccess }) {
-  const [uploadIntent, setUploadIntent] = useState(initialIntent ?? 'permanent')
-  const [expiresHours, setExpiresHours] = useState(24)
-  const [selectedFile, setSelectedFile] = useState(null)
-  const [uploading, setUploading] = useState(false)
-  const [error, setError] = useState(null)
-  const fileInput = useRef(null)
-
-  async function handleUpload() {
-    if (!selectedFile) return
-    setUploading(true)
-    setError(null)
-    try {
-      const form = new FormData()
-      form.append('upload', selectedFile)
-      form.append('intent', uploadIntent)
-      if (uploadIntent === 'temporary') form.append('expiry_hours', expiresHours)
-
-      const res = await API.postForm('/api/v1/files', form)
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail ?? `Upload failed (${res.status})`)
-      }
-      onSuccess()
-      onClose()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/35 p-4"
-      role="presentation"
-      onMouseDown={onClose}
-    >
-      <section
-        className="w-full max-w-lg bg-white shadow-2xl rounded-xl"
-        aria-labelledby="upload-title"
-        onMouseDown={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-      >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <div>
-            <h2 id="upload-title" className="text-base font-semibold text-slate-950">Upload file</h2>
-            <p className="mt-0.5 text-sm text-slate-500">Choose where this file should live.</p>
-          </div>
-          <button
-            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-800"
-            title="Close"
-            onClick={onClose}
-            type="button"
-          >
-            <X size={19} />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-5">
-          {/* Destination picker */}
-          <div className="grid grid-cols-2 gap-2" role="group" aria-label="Upload destination">
-            <button
-              className={`border rounded-lg p-3 text-left transition ${uploadIntent === 'permanent' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-slate-200 hover:border-slate-300'}`}
-              type="button"
-              onClick={() => setUploadIntent('permanent')}
-            >
-              <Cloud size={19} className="text-[#2970db]" />
-              <span className="mt-2 block text-sm font-semibold">Permanent</span>
-              <span className="mt-0.5 block text-xs text-slate-500">Google Drive</span>
-            </button>
-            <button
-              className={`border rounded-lg p-3 text-left transition ${uploadIntent === 'temporary' ? 'border-orange-500 bg-orange-50 ring-1 ring-orange-500' : 'border-slate-200 hover:border-slate-300'}`}
-              type="button"
-              onClick={() => setUploadIntent('temporary')}
-            >
-              <Archive size={19} className="text-[#de6912]" />
-              <span className="mt-2 block text-sm font-semibold">Temporary</span>
-              <span className="mt-0.5 block text-xs text-slate-500">Cloudflare R2</span>
-            </button>
-          </div>
-
-          {/* Expiry picker for temporary */}
-          {uploadIntent === 'temporary' && (
-            <label className="block text-sm font-medium text-slate-700">
-              Expires after
-              <select
-                className="mt-2 block h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
-                value={expiresHours}
-                onChange={(e) => setExpiresHours(Number(e.target.value))}
-              >
-                <option value={1}>1 hour</option>
-                <option value={24}>24 hours</option>
-                <option value={168}>7 days</option>
-              </select>
-            </label>
-          )}
-
-          {/* Drop zone */}
-          <button
-            className="flex min-h-40 w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 text-center transition hover:border-blue-400 hover:bg-blue-50"
-            type="button"
-            onClick={() => fileInput.current?.click()}
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#1668e3] shadow-sm">
-              <CloudUpload size={20} />
-            </span>
-            <span className="mt-3 text-sm font-semibold text-slate-800">
-              {selectedFile ? selectedFile.name : 'Choose a file to upload'}
-            </span>
-            <span className="mt-1 text-xs text-slate-500">
-              {selectedFile ? fmtBytes(selectedFile.size) + ' selected' : 'or drop it here'}
-            </span>
-          </button>
-          <input
-            ref={fileInput}
-            className="sr-only"
-            type="file"
-            onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
-          />
-
-          {error && (
-            <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</p>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-3 border-t border-slate-200 px-5 py-4">
-          <button
-            className="h-10 rounded-lg px-3 text-sm font-semibold text-slate-600 hover:bg-slate-100"
-            onClick={onClose}
-            type="button"
-          >
-            Cancel
-          </button>
-          <button
-            id="btn-upload-submit"
-            className="h-10 rounded-lg bg-[#1668e3] px-4 text-sm font-semibold text-white transition hover:bg-[#125bc7] disabled:cursor-not-allowed disabled:bg-slate-300 flex items-center gap-2"
-            disabled={!selectedFile || uploading}
-            onClick={handleUpload}
-            type="button"
-          >
-            {uploading && <RefreshCw size={15} className="animate-spin" />}
-            {uploading ? 'Uploading…' : `Upload to ${uploadIntent === 'permanent' ? 'Google Drive' : 'R2'}`}
-          </button>
-        </div>
-      </section>
-    </div>
-  )
+function userInitials(username) {
+  if (!username) return '?';
+  return username.substring(0, 2).toUpperCase();
 }
 
-// ─── File row (table) ─────────────────────────────────────────────────────────
-function FileRow({ file, onDelete, onDownload }) {
-  const { Icon, tone } = fileIcon(file.filename, file.provider)
-  const expiry = fmtExpiry(file.expires_at)
-
-  return (
-    <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-      <td className="px-4 py-3.5">
-        <div className="flex items-center gap-3">
-          <span className={`flex h-9 w-9 items-center justify-center rounded-md ${tone}`}>
-            <Icon size={18} />
-          </span>
-          <span>
-            <span className="block text-sm font-medium text-slate-800">{file.filename}</span>
-            {expiry && <span className="mt-0.5 block text-xs font-medium text-[#c8500a]">{expiry}</span>}
-          </span>
-        </div>
-      </td>
-      <td className="px-4 py-3.5 text-sm text-slate-600">
-        {file.provider === 'google_drive' ? 'Google Drive' : 'Cloudflare R2'}
-      </td>
-      <td className="px-4 py-3.5 text-sm text-slate-600">{fmtDate(file.created_at)}</td>
-      <td className="px-4 py-3.5 text-sm text-slate-600">{fmtBytes(file.size_bytes)}</td>
-      <td className="px-4 py-3.5">
-        <div className="flex justify-end gap-0.5">
-          <button
-            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-            title={`Download ${file.filename}`}
-            type="button"
-            onClick={() => onDownload(file)}
-          >
-            <Download size={17} />
-          </button>
-          <button
-            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-red-100 hover:text-red-600"
-            title={`Delete ${file.filename}`}
-            type="button"
-            onClick={() => onDelete(file)}
-          >
-            <Trash2 size={17} />
-          </button>
-        </div>
-      </td>
-    </tr>
-  )
-}
-
-// ─── File tile (grid) ─────────────────────────────────────────────────────────
-function FileTile({ file, onDelete, onDownload }) {
-  const { Icon, tone } = fileIcon(file.filename, file.provider)
-  const expiry = fmtExpiry(file.expires_at)
-  const [open, setOpen] = useState(false)
-
-  return (
-    <article className="relative bg-white p-4 hover:bg-slate-50">
-      <div className="flex items-start justify-between">
-        <span className={`flex h-10 w-10 items-center justify-center rounded-md ${tone}`}>
-          <Icon size={20} />
-        </span>
-        <div className="relative">
-          <button
-            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-            title="More actions"
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-          >
-            <MoreHorizontal size={18} />
-          </button>
-          {open && (
-            <div className="absolute right-0 top-9 z-10 w-36 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-              <button className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={() => { onDownload(file); setOpen(false) }} type="button">
-                <Download size={15} /> Download
-              </button>
-              <button className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50" onClick={() => { onDelete(file); setOpen(false) }} type="button">
-                <Trash2 size={15} /> Delete
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-      <h3 className="mt-5 truncate text-sm font-medium text-slate-800">{file.filename}</h3>
-      <p className="mt-1 text-xs text-slate-500">
-        {fmtBytes(file.size_bytes)} · {file.provider === 'google_drive' ? 'Drive' : 'R2'}
-      </p>
-      {expiry && <p className="mt-2 text-xs font-medium text-[#c8500a]">{expiry}</p>}
-    </article>
-  )
-}
-
-// ─── Dashboard ────────────────────────────────────────────────────────────────
-function Dashboard({ user, onLogout }) {
-  const [activeView, setActiveView] = useState('all')
-  const [query, setQuery] = useState('')
-  const [files, setFiles] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [uploadOpen, setUploadOpen] = useState(false)
-  const [uploadIntent, setUploadIntent] = useState('permanent')
-  const [isGrid, setIsGrid] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
-
-  const fetchFiles = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await API.get('/api/v1/files')
-      if (res.ok) {
-        const data = await res.json()
-        setFiles(data.files ?? [])
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { fetchFiles() }, [fetchFiles])
-
-  async function handleDelete(file) {
-    const isPermanent = file.provider === 'google_drive'
-    const warningMsg = isPermanent
-      ? `Are you sure you want to delete "${file.filename}"? This action will also permanently delete the file from your Google Drive. This cannot be undone.`
-      : `Are you sure you want to delete "${file.filename}"? This action will also permanently delete the file from temporary storage. This cannot be undone.`
-
-    if (!confirm(warningMsg)) return
-    const res = await API.delete(`/api/v1/files/${file.id}`)
-    if (res.ok) fetchFiles()
-    else alert('Delete failed. Please try again.')
-  }
-
-  async function handleDownload(file) {
-    window.open(`/api/v1/files/${file.id}/download`, '_blank')
-  }
-
-  async function handleLogout() {
-    await API.post('/api/v1/auth/logout', {})
-    onLogout()
-  }
-
-  function openUpload(intent = 'permanent') {
-    setUploadIntent(intent)
-    setUploadOpen(true)
-  }
-
-  const displayed = files.filter((f) => {
-    const matchView = activeView === 'all' || f.intent === activeView
-    return matchView && f.filename.toLowerCase().includes(query.toLowerCase())
-  })
-
-  const viewLabel = navigation.find((n) => n.value === activeView)?.label
-
-  const driveCount = files.filter((f) => f.provider === 'google_drive').length
-  const r2Count = files.filter((f) => f.provider === 'cloudflare_r2').length
-
-  return (
-    <main className="min-h-screen bg-[#f7f8fa] text-[#172033]">
-      {/* Drive connect banner */}
-      {!user.has_drive_connected && (
-        <div className="flex items-center justify-between gap-4 bg-amber-50 border-b border-amber-200 px-5 py-3">
-          <div className="flex items-center gap-3">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
-              <Link size={16} />
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-amber-900">Connect Google Drive to upload permanent files</p>
-              <p className="text-xs text-amber-700">One-time setup — your files will be stored in your own Google Drive.</p>
-            </div>
-          </div>
-          <a
-            id="btn-connect-drive"
-            href="/api/v1/auth/google/connect"
-            className="shrink-0 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-600"
-          >
-            Connect Drive
-          </a>
-        </div>
-      )}
-      {/* Header */}
-      <header className="sticky top-0 z-20 flex h-16 items-center border-b border-slate-200 bg-white px-4 lg:px-7">
-        <a className="flex items-center gap-2.5 font-semibold tracking-tight text-slate-950" href="#">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1668e3] text-white shadow-sm">
-            <Cloud size={18} strokeWidth={2.5} />
-          </span>
-          FlowDrive
-        </a>
-
-        <label className="relative ml-6 hidden max-w-xl flex-1 md:block">
-          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input
-            className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
-            type="search"
-            placeholder="Search your files"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-
-        <div className="ml-auto flex items-center gap-1.5 relative">
-          <button
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
-            title="Notifications"
-            type="button"
-          >
-            <Bell size={19} />
-          </button>
-
-          <button
-            id="btn-user-menu"
-            className="ml-1 flex h-9 items-center gap-2 rounded-md px-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-            type="button"
-            onClick={() => setUserMenuOpen((v) => !v)}
-          >
-            {user.avatar_url ? (
-              <img src={user.avatar_url} className="h-7 w-7 rounded-full object-cover" alt="" />
-            ) : (
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#d9e9ff] text-xs font-bold text-[#1755a6]">
-                {userInitials(user.display_name, user.email)}
-              </span>
-            )}
-            <span className="hidden sm:block">{user.display_name?.split(' ')[0] ?? user.email}</span>
-            <ChevronDown size={16} className="hidden text-slate-400 sm:block" />
-          </button>
-
-          {userMenuOpen && (
-            <div className="absolute right-0 top-12 z-30 w-52 rounded-xl border border-slate-200 bg-white py-2 shadow-xl">
-              <div className="px-4 py-2 border-b border-slate-100">
-                <p className="text-xs font-semibold text-slate-800 truncate">{user.display_name}</p>
-                <p className="text-xs text-slate-500 truncate">{user.email}</p>
-                {user.has_drive_connected && (
-                  <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-700">
-                    <Cloud size={10} /> Drive connected
-                  </span>
-                )}
-              </div>
-              <button
-                id="btn-logout"
-                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-red-600"
-                onClick={handleLogout}
-                type="button"
-              >
-                <LogOut size={15} /> Sign out
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
-
-      <div className="mx-auto flex w-full max-w-[1440px]">
-        {/* Sidebar */}
-        <aside className="hidden min-h-[calc(100vh-4rem)] w-60 shrink-0 border-r border-slate-200 bg-white p-4 lg:block">
-          <button
-            id="btn-upload-open"
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#1668e3] px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#125bc7] focus:outline-none focus:ring-4 focus:ring-blue-200"
-            type="button"
-            onClick={() => openUpload()}
-          >
-            <Plus size={18} />
-            Upload files
-          </button>
-
-          <nav className="mt-6 space-y-1" aria-label="File views">
-            {navigation.map((item) => {
-              const Icon = item.icon
-              const isActive = activeView === item.value
-              return (
-                <button
-                  className={`flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-medium transition ${isActive ? 'bg-blue-50 text-[#165dca]' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
-                  key={item.value}
-                  onClick={() => setActiveView(item.value)}
-                  type="button"
-                >
-                  <Icon size={18} />
-                  {item.label}
-                </button>
-              )
-            })}
-          </nav>
-
-          <div className="mt-8 border-t border-slate-200 pt-5">
-            <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Storage</p>
-            <div className="mt-3 px-3 space-y-4">
-              <div>
-                <div className="flex items-center justify-between text-xs text-slate-600">
-                  <span>Google Drive</span>
-                  <span>{driveCount} file{driveCount !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-[#4285f4] transition-all" style={{ width: driveCount ? `${Math.min(driveCount * 10, 100)}%` : '0%' }} />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between text-xs text-slate-600">
-                  <span>Cloudflare R2</span>
-                  <span>{r2Count} file{r2Count !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-[#f48120] transition-all" style={{ width: r2Count ? `${Math.min(r2Count * 10, 100)}%` : '0%' }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main content */}
-        <section className="min-w-0 flex-1 px-4 py-7 sm:px-7 lg:px-10">
-          <div id="top" className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Workspace</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{viewLabel}</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
-                title="Refresh"
-                type="button"
-                onClick={fetchFiles}
-              >
-                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              </button>
-              <button
-                className="inline-flex h-10 items-center gap-2 rounded-md bg-[#1668e3] px-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#125bc7] focus:outline-none focus:ring-4 focus:ring-blue-200 lg:hidden"
-                type="button"
-                onClick={() => openUpload()}
-              >
-                <Plus size={18} />
-                Upload
-              </button>
-            </div>
-          </div>
-
-          {/* Quick action cards */}
-          <div className="mt-7 grid gap-4 md:grid-cols-2">
-            <button
-              className="group flex min-h-32 items-start gap-4 rounded-xl border border-slate-200 bg-white p-5 text-left transition hover:border-blue-300 hover:shadow-sm"
-              type="button"
-              onClick={() => openUpload('permanent')}
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#e9f1ff] text-[#2970db]">
-                <Cloud size={21} />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold text-slate-900">Permanent storage</span>
-                <span className="mt-1 block text-sm leading-5 text-slate-500">Upload to Google Drive — files stay forever</span>
-                <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#1668e3]">
-                  Upload permanent file <Upload size={15} />
-                </span>
-              </span>
-            </button>
-            <button
-              className="group flex min-h-32 items-start gap-4 rounded-xl border border-slate-200 bg-white p-5 text-left transition hover:border-orange-300 hover:shadow-sm"
-              type="button"
-              onClick={() => openUpload('temporary')}
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#fff1e5] text-[#de6912]">
-                <Archive size={20} />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold text-slate-900">Temporary storage</span>
-                <span className="mt-1 block text-sm leading-5 text-slate-500">Upload to Cloudflare R2 with auto-expiry</span>
-                <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#c8500a]">
-                  Upload temporary file <Upload size={15} />
-                </span>
-              </span>
-            </button>
-          </div>
-
-          {/* Files table/grid */}
-          <div className="mt-8 overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-slate-900">Files</span>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                  {displayed.length}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <label className="relative md:hidden">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                  <input
-                    className="h-9 w-44 rounded-md border border-slate-200 pl-8 pr-2 text-sm outline-none focus:border-blue-500"
-                    placeholder="Search files"
-                    type="search"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                  />
-                </label>
-                <div className="flex rounded-md border border-slate-200 p-0.5">
-                  <button
-                    className={`flex h-7 w-7 items-center justify-center rounded ${!isGrid ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-700'}`}
-                    title="List view"
-                    type="button"
-                    onClick={() => setIsGrid(false)}
-                  >
-                    <LayoutList size={16} />
-                  </button>
-                  <button
-                    className={`flex h-7 w-7 items-center justify-center rounded ${isGrid ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-700'}`}
-                    title="Grid view"
-                    type="button"
-                    onClick={() => setIsGrid(true)}
-                  >
-                    <Grid2X2 size={16} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="flex min-h-72 flex-col items-center justify-center gap-3 text-slate-400">
-                <RefreshCw size={24} className="animate-spin" />
-                <p className="text-sm">Loading your files…</p>
-              </div>
-            ) : displayed.length === 0 ? (
-              <div className="flex min-h-72 flex-col items-center justify-center px-4 text-center">
-                <FolderOpen size={32} className="text-slate-300" />
-                <p className="mt-3 text-sm font-semibold text-slate-800">
-                  {files.length === 0 ? 'No files uploaded yet' : 'No matching files'}
-                </p>
-                {files.length === 0 ? (
-                  <button
-                    className="mt-4 text-sm font-semibold text-[#1668e3] hover:text-[#125bc7]"
-                    onClick={() => openUpload()}
-                    type="button"
-                  >
-                    Upload your first file
-                  </button>
-                ) : (
-                  <button
-                    className="mt-4 text-sm font-semibold text-[#1668e3] hover:text-[#125bc7]"
-                    onClick={() => { setQuery(''); setActiveView('all') }}
-                    type="button"
-                  >
-                    Clear filters
-                  </button>
-                )}
-              </div>
-            ) : isGrid ? (
-              <div className="grid gap-px bg-slate-200 sm:grid-cols-2 xl:grid-cols-3">
-                {displayed.map((f) => (
-                  <FileTile key={f.id} file={f} onDelete={handleDelete} onDownload={handleDownload} />
-                ))}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[700px] text-left">
-                  <thead className="border-b border-slate-100 text-xs font-semibold uppercase tracking-[0.06em] text-slate-400">
-                    <tr>
-                      <th className="px-4 py-3 font-semibold">Name</th>
-                      <th className="px-4 py-3 font-semibold">Location</th>
-                      <th className="px-4 py-3 font-semibold">Uploaded</th>
-                      <th className="px-4 py-3 font-semibold">Size</th>
-                      <th className="w-24 px-4 py-3"><span className="sr-only">Actions</span></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayed.map((f) => (
-                      <FileRow key={f.id} file={f} onDelete={handleDelete} onDownload={handleDownload} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
-
-      {uploadOpen && (
-        <UploadModal
-          initialIntent={uploadIntent}
-          onClose={() => setUploadOpen(false)}
-          onSuccess={fetchFiles}
-        />
-      )}
-    </main>
-  )
-}
-
-// ─── Connect Google Page ──────────────────────────────────────────────────────
-function ConnectGooglePage({ user, onLogout }) {
-  const [loading, setLoading] = useState(false)
-
-  function handleConnect() {
-    setLoading(true)
-    window.location.href = '/api/v1/auth/google/connect'
-  }
-
-  async function handleLogoutClick() {
-    setLoading(true)
-    try {
-      await API.post('/api/v1/auth/logout')
-      onLogout()
-    } catch {
-      alert('Failed to log out.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f7f8fa] px-4 py-10">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="flex flex-col items-center text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1668e3] text-white shadow-lg">
-            <Cloud size={28} strokeWidth={2.5} />
-          </span>
-          <h1 className="mt-6 text-2xl font-bold tracking-tight text-slate-950">Link Google Drive</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Welcome to FlowDrive, <span className="font-semibold">{user.username}</span>! 
-            To store, view, and manage your permanent files, link your Google account.
-          </p>
-          <div className="mt-1 text-xs text-slate-400">
-            FlowDrive only requests access to files it creates.
-          </div>
-        </div>
-
-        <div className="mt-8 space-y-3">
-          <button
-            id="btn-connect-google"
-            type="button"
-            className="flex h-11 w-full items-center justify-center gap-3 rounded-lg bg-[#1668e3] text-sm font-semibold text-white shadow-md transition hover:bg-[#125bc7] hover:shadow-lg disabled:opacity-60 cursor-pointer"
-            onClick={handleConnect}
-            disabled={loading}
-          >
-            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-              <path fill="#ffffff" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z" />
-              <path fill="#ffffff" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.32-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z" />
-              <path fill="#ffffff" d="M11.68 28.18A13.93 13.93 0 0 1 10.7 24c0-1.45.25-2.86.69-4.18v-5.7H4.34A23.93 23.93 0 0 0 0 24c0 3.88.93 7.55 2.56 10.81l7.12-5.52z" />
-              <path fill="#ffffff" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.34 5.7C13.42 14.62 18.27 10.75 24 10.75z" />
-            </svg>
-            Connect Google Account
-          </button>
-
-          <button
-            type="button"
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 cursor-pointer"
-            onClick={handleLogoutClick}
-            disabled={loading}
-          >
-            <LogOut size={16} />
-            Log Out
-          </button>
-        </div>
-      </div>
-    </main>
-  )
-}
-
-// ─── Root app — handles auth state ────────────────────────────────────────────
+// ─── App root ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [authState, setAuthState] = useState('loading') // 'loading' | 'unauthenticated' | 'needs_drive' | 'authenticated'
-  const [user, setUser] = useState(null)
+  const [authState, setAuthState] = useState('loading');
+  const [user,      setUser]      = useState(null);
 
+  // Auth form state
+  const [authTab,    setAuthTab]    = useState('login');
+  const [siUser,     setSiUser]     = useState('');
+  const [siPass,     setSiPass]     = useState('');
+  const [suUsername, setSuUsername] = useState('');
+  const [suPass,     setSuPass]     = useState('');
+  const [error,      setError]      = useState('');
+  const [loading,    setLoading]    = useState(false);
+
+  // Dashboard state
+  const [files,       setFiles]       = useState([]);
+  const [activeTab,   setActiveTab]   = useState('permanent'); // 'permanent' | 'temporary'
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Multi-Drive state
+  const [driveAccounts,          setDriveAccounts]          = useState([]);
+  const [driveAccountsLoading,   setDriveAccountsLoading]   = useState(false);
+  const [selectedDriveAccountId, setSelectedDriveAccountId] = useState(null);
+  const [driveError,             setDriveError]             = useState(null);
+
+  // Upload Destination Options State
+  const [uploadIntent,   setUploadIntent]   = useState('permanent');
+  const [expiresHours,   setExpiresHours]   = useState('24');
+  const [isDragging,     setIsDragging]     = useState(false);
+
+  // Multi-File Upload Queue & Concurrency State
+  const [uploadQueue,        setUploadQueue]        = useState([]);
+  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
+  const [maxConcurrency,    setMaxConcurrency]    = useState(3); // 1, 3, or 5 parallel uploads
+
+  const fileInputRef = useRef(null);
+  const activeAbortsRef = useRef({}); // Stores abort functions per queue item ID
+  const uploadQueueRef = useRef([]);  // Synchronous ref to prevent React state updater race conditions
+
+  // Helper to keep state and ref in sync
+  const updateQueue = useCallback((updater) => {
+    const next = typeof updater === 'function' ? updater(uploadQueueRef.current) : updater;
+    uploadQueueRef.current = next;
+    setUploadQueue(next);
+  }, []);
+
+  // ─── Auth check on mount ──────────────────────────────────────────────────
   useEffect(() => {
     API.get('/api/v1/auth/me')
       .then(async (res) => {
         if (res.ok) {
-          const userData = await res.json()
-          setUser(userData)
-          if (userData.has_drive_connected) {
-            setAuthState('authenticated')
-          } else {
-            setAuthState('needs_drive')
+          const userData = await res.json();
+          setUser(userData);
+          if (userData.has_drive_connected) setAuthState('authenticated');
+          else setAuthState('needs_drive');
+          if (window.location.pathname !== '/') window.history.replaceState({}, '', '/');
+          if (window.location.search) {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('error')) setError(urlParams.get('error'));
+            window.history.replaceState({}, '', window.location.pathname);
           }
-          if (window.location.pathname !== '/') {
-            window.history.replaceState({}, '', '/')
-          }
-          if (window.location.search) window.history.replaceState({}, '', window.location.pathname)
         } else {
-          setAuthState('unauthenticated')
-          if (window.location.pathname !== '/') {
-            window.history.replaceState({}, '', '/')
-          }
+          setAuthState('unauthenticated');
+          if (window.location.pathname !== '/') window.history.replaceState({}, '', '/');
         }
       })
       .catch(() => {
-        setAuthState('unauthenticated')
-        if (window.location.pathname !== '/') {
-          window.history.replaceState({}, '', '/')
-        }
-      })
-  }, [])
+        setAuthState('unauthenticated');
+        if (window.location.pathname !== '/') window.history.replaceState({}, '', '/');
+      });
+  }, []);
 
-  function handleAuth(userData) {
-    setUser(userData)
-    if (userData.has_drive_connected) {
-      setAuthState('authenticated')
-    } else {
-      setAuthState('needs_drive')
+  const fetchFiles = useCallback(async () => {
+    if (authState !== 'authenticated') return;
+    try {
+      const res = await API.get('/api/v1/files');
+      if (res.ok) {
+        const data = await res.json();
+        setFiles(data.files ?? []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch files', e);
     }
-    if (window.location.search) window.history.replaceState({}, '', window.location.pathname)
+  }, [authState]);
+
+  const fetchDriveAccounts = useCallback(async () => {
+    if (authState !== 'authenticated') return;
+    setDriveAccountsLoading(true);
+    setDriveError(null);
+    try {
+      const res = await API.get('/api/v1/drive/accounts');
+      if (res.ok) {
+        const data = await res.json();
+        const accounts = data.accounts ?? [];
+        setDriveAccounts(accounts);
+        const def = accounts.find(a => a.is_default) ?? accounts[0];
+        if (def) setSelectedDriveAccountId(def.id);
+      }
+    } catch (e) {
+      console.error('Failed to fetch drive accounts', e);
+    } finally {
+      setDriveAccountsLoading(false);
+    }
+  }, [authState]);
+
+  useEffect(() => {
+    if (authState === 'authenticated') {
+      fetchFiles();
+      fetchDriveAccounts();
+    }
+  }, [authState, fetchFiles, fetchDriveAccounts]);
+
+  const onAuth = (userData) => {
+    setUser(userData);
+    if (userData.has_drive_connected) setAuthState('authenticated');
+    else setAuthState('needs_drive');
+  };
+
+  // ─── Parallel Worker Pool Queue Processor ────────────────────────────────
+  const processQueue = useCallback(async () => {
+    if (isProcessingQueue) return;
+    setIsProcessingQueue(true);
+
+    const runWorker = async () => {
+      while (true) {
+        // Synchronously find next pending item in Ref
+        const pendingIdx = uploadQueueRef.current.findIndex(item => item.status === 'pending');
+        if (pendingIdx === -1) break; // No pending items left for this worker
+
+        const targetItem = uploadQueueRef.current[pendingIdx];
+
+        // Synchronously mark item as uploading in Ref to claim it before other workers look
+        const updatedQueue = [...uploadQueueRef.current];
+        updatedQueue[pendingIdx] = { ...targetItem, status: 'uploading', progressPct: 0 };
+        updateQueue(updatedQueue);
+
+        try {
+          const form = new FormData();
+          form.append('upload', targetItem.file);
+          form.append('intent', targetItem.intent);
+          if (targetItem.intent === 'permanent' && targetItem.driveAccountId) {
+            form.append('drive_account_id', targetItem.driveAccountId);
+          }
+          if (targetItem.intent === 'temporary') {
+            form.append('expiry_hours', targetItem.expiresHours);
+          }
+
+          const res = await API.postFormWithProgress(
+            '/api/v1/files',
+            form,
+            (pct, loaded, total) => {
+              const idx = uploadQueueRef.current.findIndex(i => i.id === targetItem.id);
+              if (idx !== -1) {
+                const next = [...uploadQueueRef.current];
+                next[idx] = { ...next[idx], progressPct: pct, loaded, total };
+                updateQueue(next);
+              }
+            },
+            (abortFn) => {
+              activeAbortsRef.current[targetItem.id] = abortFn;
+            }
+          );
+
+          delete activeAbortsRef.current[targetItem.id];
+
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.detail ?? `Upload failed (${res.status})`);
+          }
+
+          // Mark completed
+          const idx = uploadQueueRef.current.findIndex(i => i.id === targetItem.id);
+          if (idx !== -1) {
+            const next = [...uploadQueueRef.current];
+            next[idx] = { ...next[idx], status: 'completed', progressPct: 100 };
+            updateQueue(next);
+          }
+          fetchFiles();
+          fetchDriveAccounts();
+        } catch (err) {
+          delete activeAbortsRef.current[targetItem.id];
+          const isCancelled = err.message?.includes('cancelled');
+          const idx = uploadQueueRef.current.findIndex(i => i.id === targetItem.id);
+          if (idx !== -1) {
+            const next = [...uploadQueueRef.current];
+            next[idx] = {
+              ...next[idx],
+              status: isCancelled ? 'cancelled' : 'error',
+              errorMsg: isCancelled ? null : err.message
+            };
+            updateQueue(next);
+          }
+        }
+      }
+    };
+
+    // Spawn maxConcurrency worker loops
+    const workers = Array.from({ length: maxConcurrency }, () => runWorker());
+    await Promise.all(workers);
+    setIsProcessingQueue(false);
+  }, [isProcessingQueue, maxConcurrency, fetchFiles, fetchDriveAccounts, updateQueue]);
+
+  // Auto-start queue worker pool when pending items exist
+  useEffect(() => {
+    const hasPending = uploadQueue.some(item => item.status === 'pending');
+    if (hasPending && !isProcessingQueue) {
+      processQueue();
+    }
+  }, [uploadQueue, isProcessingQueue, processQueue]);
+
+  function addFilesToQueue(fileList) {
+    if (!fileList || fileList.length === 0) return;
+    const newItems = Array.from(fileList).map((file, idx) => ({
+      id: `q-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
+      file: file,
+      intent: uploadIntent,
+      driveAccountId: uploadIntent === 'permanent' ? selectedDriveAccountId : null,
+      expiresHours: expiresHours,
+      status: 'pending',
+      progressPct: 0,
+      loaded: 0,
+      total: file.size,
+      errorMsg: null,
+    }));
+    updateQueue(prev => [...prev, ...newItems]);
   }
 
+  function cancelOrRemoveQueueItem(itemId) {
+    if (activeAbortsRef.current[itemId]) {
+      try {
+        activeAbortsRef.current[itemId]();
+      } catch (e) {}
+      delete activeAbortsRef.current[itemId];
+    }
+    updateQueue(prev => prev.filter(item => item.id !== itemId));
+  }
+
+  function clearCompletedQueue() {
+    updateQueue(prev => prev.filter(item => item.status !== 'completed' && item.status !== 'cancelled'));
+  }
+
+  function retryFailedQueue() {
+    updateQueue(prev => prev.map(item => (item.status === 'error' || item.status === 'cancelled') ? { ...item, status: 'pending', errorMsg: null, progressPct: 0 } : item));
+  }
+
+  // Aggregate storage calculations
+  const totalUsedBytes = driveAccounts.reduce((acc, a) => acc + (a.storage?.used_bytes || 0), 0);
+  const totalLimitBytes = driveAccounts.reduce((acc, a) => acc + (a.storage?.limit_bytes || 0), 0);
+  const totalUsagePct = totalLimitBytes > 0 ? Math.min(Math.round((totalUsedBytes / totalLimitBytes) * 100), 100) : 0;
+
+  // Queue progress aggregates
+  const completedCount = uploadQueue.filter(i => i.status === 'completed').length;
+  const uploadingCount = uploadQueue.filter(i => i.status === 'uploading').length;
+  const totalQueueCount = uploadQueue.length;
+  const totalQueueBytes = uploadQueue.reduce((acc, i) => acc + i.total, 0);
+  const loadedQueueBytes = uploadQueue.reduce((acc, i) => acc + (i.status === 'completed' ? i.total : (i.loaded || 0)), 0);
+  const overallQueuePct = totalQueueBytes > 0 ? Math.min(Math.round((loadedQueueBytes / totalQueueBytes) * 100), 100) : 0;
+
+  // ─── Handlers ─────────────────────────────────────────────────────────────
+  async function handleSignIn(e) {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    try {
+      const res  = await API.post('/api/v1/auth/login', { username: siUser, password: siPass });
+      const data = await res.json();
+      if (!res.ok) { setError(data.detail ?? 'Login failed.'); return; }
+      onAuth(data);
+    } catch { setError('Network error. Please try again.'); }
+    finally   { setLoading(false); }
+  }
+
+  async function handleSignUp(e) {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    try {
+      const res  = await API.post('/api/v1/auth/register', { username: suUsername, password: suPass });
+      const data = await res.json();
+      if (!res.ok) { setError(data.detail ?? 'Registration failed.'); return; }
+      onAuth(data);
+    } catch { setError('Network error. Please try again.'); }
+    finally   { setLoading(false); }
+  }
+
+  async function handleLogout() {
+    await API.post('/api/v1/auth/logout', {});
+    setAuthState('unauthenticated');
+    setUser(null);
+  }
+
+  async function handleDelete(file) {
+    const msg = file.provider === 'google_drive'
+      ? `Delete "${file.filename}" from Google Drive? This cannot be undone.`
+      : `Delete "${file.filename}" from temporary storage? This cannot be undone.`;
+    if (!window.confirm(msg)) return;
+    const res = await API.delete(`/api/v1/files/${file.id}`);
+    if (res.ok) {
+      fetchFiles();
+      fetchDriveAccounts();
+    } else {
+      alert('Delete failed. Please try again.');
+    }
+  }
+
+  function handleDownload(file) {
+    window.open(`/api/v1/files/${file.id}/download`, '_blank');
+  }
+
+  async function handleSetDefaultDrive(accountId) {
+    setDriveError(null);
+    try {
+      const res = await API.patch(`/api/v1/drive/accounts/${accountId}/default`, {});
+      if (res.ok) {
+        fetchDriveAccounts();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setDriveError(data.detail ?? 'Failed to set default Drive account.');
+      }
+    } catch (e) {
+      setDriveError('Failed to set default Drive account.');
+    }
+  }
+
+  async function handleDisconnectDrive(account) {
+    if (!window.confirm(`Disconnect Google account (${account.account_email})?`)) return;
+    setDriveError(null);
+    try {
+      const res = await API.delete(`/api/v1/drive/accounts/${account.id}`);
+      if (res.ok) {
+        fetchDriveAccounts();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setDriveError(data.detail ?? 'Failed to disconnect Drive account.');
+      }
+    } catch (e) {
+      setDriveError('Failed to disconnect Drive account.');
+    }
+  }
+
+  // ─── Loading screen ───────────────────────────────────────────────────────
   if (authState === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f7f8fa]">
-        <div className="flex flex-col items-center gap-4 text-slate-400">
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#1668e3] text-white shadow">
-            <Cloud size={24} />
-          </span>
-          <RefreshCw size={20} className="animate-spin" />
+      <div style={{ minHeight: '100vh', background: '#F8F9FA', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+        <div style={{ background: '#4285F4', borderRadius: '12px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Cloud color="white" size={24} />
+        </div>
+        <RefreshCw size={18} style={{ color: '#9AA0A6' }} className="animate-spin-slow" />
+      </div>
+    );
+  }
+
+  // ─── Auth page (split-screen) ─────────────────────────────────────────────
+  if (authState === 'unauthenticated') {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh' }}>
+
+        {/* Left brand panel — desktop only */}
+        <div
+          className="hidden lg:flex"
+          style={{
+            flex: 1, flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '48px', background: 'linear-gradient(145deg, #EEF2FF 0%, #F5F7FF 50%, #FFFFFF 100%)',
+          }}
+        >
+          <div style={{ textAlign: 'center', maxWidth: '300px' }}>
+            <div style={{ background: '#4285F4', borderRadius: '18px', width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+              <Cloud color="white" size={30} />
+            </div>
+            <h1 style={{ fontSize: '40px', fontWeight: 700, color: '#202124', margin: '0 0 12px', letterSpacing: '-0.5px' }}>FlowDrive</h1>
+            <p style={{ fontSize: '17px', color: '#5F6368', margin: 0, lineHeight: 1.6 }}>Your storage, one vault.</p>
+          </div>
+        </div>
+
+        {/* Right form panel */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFFFFF', padding: '48px 24px' }}>
+          <div style={{ width: '100%', maxWidth: '360px' }}>
+
+            {/* Mobile logo */}
+            <div className="flex lg:hidden" style={{ alignItems: 'center', gap: '10px', marginBottom: '32px' }}>
+              <div style={{ background: '#4285F4', borderRadius: '10px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Cloud color="white" size={18} />
+              </div>
+              <span style={{ fontWeight: 700, fontSize: '18px', color: '#202124' }}>FlowDrive</span>
+            </div>
+
+            <h2 style={{ fontSize: '22px', fontWeight: 600, color: '#202124', margin: '0 0 4px' }}>
+              {authTab === 'login' ? 'Welcome back' : 'Create your account'}
+            </h2>
+            <p style={{ fontSize: '14px', color: '#5F6368', margin: '0 0 24px' }}>
+              {authTab === 'login' ? 'Sign in to access your files.' : 'Get started with FlowDrive.'}
+            </p>
+
+            {/* Error banner */}
+            {error && (
+              <div style={{ background: '#FDE8E8', border: '1px solid #F5C6C6', borderRadius: '8px', padding: '11px 14px', fontSize: '13px', color: '#C5221F', marginBottom: '20px' }}>
+                {error === 'oauth_failed' ? 'Google sign-in failed. Please try again.' : error}
+              </div>
+            )}
+
+            {/* Tab switcher */}
+            <div style={{ display: 'flex', background: '#F1F3F4', borderRadius: '8px', padding: '3px', marginBottom: '20px' }}>
+              {[{ id: 'login', label: 'Log in' }, { id: 'signup', label: 'Sign up' }].map(({ id, label }) => (
+                <button
+                  key={id}
+                  onClick={() => { setAuthTab(id); setError(''); }}
+                  style={{
+                    flex: 1, height: '34px', borderRadius: '6px', fontSize: '14px', fontWeight: 500,
+                    border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                    background: authTab === id ? '#FFFFFF' : 'transparent',
+                    color:      authTab === id ? '#202124' : '#5F6368',
+                    boxShadow:  authTab === id ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Login form */}
+            {authTab === 'login' ? (
+              <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label htmlFor="si-user" style={{ fontSize: '13px', fontWeight: 500, color: '#202124', display: 'block', marginBottom: '6px' }}>Username</label>
+                  <input id="si-user" type="text" placeholder="your_username" autoComplete="username" value={siUser} onChange={e => setSiUser(e.target.value)} required style={S.input} />
+                </div>
+                <div>
+                  <label htmlFor="si-pass" style={{ fontSize: '13px', fontWeight: 500, color: '#202124', display: 'block', marginBottom: '6px' }}>Password</label>
+                  <input id="si-pass" type="password" placeholder="••••••••" autoComplete="current-password" value={siPass} onChange={e => setSiPass(e.target.value)} required style={S.input} />
+                </div>
+                <button type="submit" disabled={loading} style={{ ...S.btnPrimary, marginTop: '4px', opacity: loading ? 0.72 : 1 }}>
+                  {loading && <RefreshCw size={14} className="animate-spin" />}
+                  Log in
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleSignUp} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label htmlFor="su-username" style={{ fontSize: '13px', fontWeight: 500, color: '#202124', display: 'block', marginBottom: '6px' }}>Username</label>
+                  <input id="su-username" type="text" placeholder="cool_username" autoComplete="username" value={suUsername} onChange={e => setSuUsername(e.target.value)} required pattern="[a-zA-Z0-9_]+" style={S.input} />
+                </div>
+                <div>
+                  <label htmlFor="su-pass" style={{ fontSize: '13px', fontWeight: 500, color: '#202124', display: 'block', marginBottom: '6px' }}>
+                    Password <span style={{ fontWeight: 400, color: '#5F6368' }}>(min 8 chars)</span>
+                  </label>
+                  <input id="su-pass" type="password" placeholder="••••••••" autoComplete="new-password" value={suPass} onChange={e => setSuPass(e.target.value)} required minLength={8} style={S.input} />
+                </div>
+                <button type="submit" disabled={loading} style={{ ...S.btnPrimary, marginTop: '4px', opacity: loading ? 0.72 : 1 }}>
+                  {loading && <RefreshCw size={14} className="animate-spin" />}
+                  Create account
+                </button>
+              </form>
+            )}
+
+            <p style={{ fontSize: '12px', color: '#9AA0A6', textAlign: 'center', marginTop: '20px' }}>
+              By continuing you agree to FlowDrive's terms.
+            </p>
+          </div>
         </div>
       </div>
-    )
+    );
   }
 
-  if (authState === 'unauthenticated') {
-    return <AuthPage onAuth={handleAuth} />
-  }
-
+  // ─── Connect Google Drive page ────────────────────────────────────────────
   if (authState === 'needs_drive') {
     return (
-      <ConnectGooglePage
-        user={user}
-        onLogout={() => { setUser(null); setAuthState('unauthenticated') }}
-      />
-    )
+      <div style={{ minHeight: '100vh', background: '#F8F9FA', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ background: '#FFFFFF', border: '1px solid #DADCE0', borderRadius: '16px', padding: '40px 32px', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
+          <div style={{ background: '#4285F4', borderRadius: '14px', width: '52px', height: '52px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+            <Cloud color="white" size={26} />
+          </div>
+          <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#202124', margin: '0 0 10px' }}>Link Google Drive</h1>
+          <p style={{ fontSize: '14px', color: '#5F6368', margin: '0 0 6px', lineHeight: 1.6 }}>
+            Welcome, <strong>{user?.username}</strong>. FlowDrive needs your Google account to store permanent files in your own Drive.
+          </p>
+          <p style={{ fontSize: '12px', color: '#9AA0A6', margin: '0 0 28px' }}>We only request access to files FlowDrive creates.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button onClick={() => { window.location.href = '/api/v1/auth/google/connect'; }} style={S.btnPrimary}>
+              <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="currentColor" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z" />
+                <path fill="currentColor" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.32-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z" />
+                <path fill="currentColor" d="M11.68 28.18A13.93 13.93 0 0 1 10.7 24c0-1.45.25-2.86.69-4.18v-5.7H4.34A23.93 23.93 0 0 0 0 24c0 3.88.93 7.55 2.56 10.81l7.12-5.52z" />
+                <path fill="currentColor" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.34 5.7C13.42 14.62 18.27 10.75 24 10.75z" />
+              </svg>
+              Connect Google Account
+            </button>
+            <button onClick={handleLogout} style={S.btnOutline}>
+              <LogOut size={14} /> Log Out
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
+  // ─── Dashboard ────────────────────────────────────────────────────────────
+  const filteredFiles = files.filter(f => {
+    if (f.intent !== activeTab) return false;
+    if (searchQuery && !f.filename.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+
+  const dropZoneClass = ['drop-zone', isDragging ? 'drag-over' : '']
+    .filter(Boolean).join(' ');
+
   return (
-    <Dashboard
-      user={user}
-      onLogout={() => { setUser(null); setAuthState('unauthenticated') }}
-    />
-  )
+    <div style={{ minHeight: '100vh', background: '#F8F9FA' }}>
+
+      {/* ─── Top Nav ──────────────────────────────────────────────────────────── */}
+      <nav style={{ background: '#FFFFFF', borderBottom: '1px solid #DADCE0', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 24px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ background: '#4285F4', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Cloud color="white" size={16} />
+            </div>
+            <span style={{ fontWeight: 700, fontSize: '16px', color: '#202124' }}>FlowDrive</span>
+          </div>
+
+          {/* User + logout */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '28px', height: '28px', background: '#4285F4', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#FFFFFF', flexShrink: 0, letterSpacing: '0.02em' }}>
+                {userInitials(user?.username)}
+              </div>
+              <span style={{ fontSize: '14px', color: '#5F6368', fontWeight: 500 }}>{user?.username}</span>
+            </div>
+            <button
+              id="logout-btn"
+              onClick={handleLogout}
+              title="Log out"
+              style={S.btnIcon}
+              onMouseEnter={e => e.currentTarget.style.background = '#F1F3F4'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* ─── Main Content Container ───────────────────────────────────────────── */}
+      <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px 80px' }}>
+
+        {/* ─── TOP SECTION: Total Statistics Bar ─────────────────────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+
+          {/* Card 1: Total Storage Capacity */}
+          <div style={{ background: '#FFFFFF', border: '1px solid #DADCE0', borderRadius: '16px', padding: '20px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ width: '36px', height: '36px', background: '#EEF4FF', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <HardDrive size={18} color="#4285F4" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#5F6368', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total Storage Capacity</span>
+              </div>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: totalUsagePct > 85 ? '#EA4335' : '#4285F4' }}>
+                {totalUsagePct}% filled
+              </span>
+            </div>
+            <div style={{ fontSize: '20px', fontWeight: 700, color: '#202124', marginBottom: '8px' }}>
+              {fmtBytes(totalUsedBytes)} <span style={{ fontSize: '13px', fontWeight: 400, color: '#5F6368' }}>of {totalLimitBytes ? fmtBytes(totalLimitBytes) : 'Unlimited'}</span>
+            </div>
+            {/* Aggregate Storage Line Bar */}
+            <div style={{ height: '8px', background: '#E8EAED', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${totalUsagePct}%`, background: totalUsagePct > 85 ? '#EA4335' : '#4285F4', borderRadius: '4px', transition: 'width 0.3s ease' }} />
+            </div>
+          </div>
+
+          {/* Card 2: Connected Google Drives */}
+          <div style={{ background: '#FFFFFF', border: '1px solid #DADCE0', borderRadius: '16px', padding: '20px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ width: '36px', height: '36px', background: '#EEF4FF', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Cloud size={18} color="#4285F4" />
+              </div>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#5F6368', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Connected Google Drives</span>
+            </div>
+            <div style={{ fontSize: '20px', fontWeight: 700, color: '#202124', marginBottom: '4px' }}>
+              {driveAccounts.length} Active {driveAccounts.length === 1 ? 'Drive' : 'Drives'}
+            </div>
+            <p style={{ fontSize: '13px', color: '#5F6368', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              Primary: {driveAccounts.find(a => a.is_default)?.account_email || 'None'}
+            </p>
+          </div>
+
+          {/* Card 3: Total Files Stored */}
+          <div style={{ background: '#FFFFFF', border: '1px solid #DADCE0', borderRadius: '16px', padding: '20px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ width: '36px', height: '36px', background: '#EEF4FF', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FileIcon size={18} color="#4285F4" />
+              </div>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#5F6368', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total Files Stored</span>
+            </div>
+            <div style={{ fontSize: '20px', fontWeight: 700, color: '#202124', marginBottom: '4px' }}>
+              {files.length} {files.length === 1 ? 'File' : 'Files'}
+            </div>
+            <p style={{ fontSize: '13px', color: '#5F6368', margin: 0 }}>
+              {files.filter(f => f.intent === 'permanent').length} Drive · {files.filter(f => f.intent === 'temporary').length} R2
+            </p>
+          </div>
+
+        </div>
+
+        {/* ─── TWO COLUMN LAYOUT: Left Sidebar (Drives) + Main Right Area ───── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 320px) 1fr', gap: '28px', alignItems: 'start' }} className="grid-cols-1 lg:grid-cols-[320px_1fr]">
+
+          {/* ─── LEFT COLUMN: Connected Drives & Individual Stats ─────────────── */}
+          <aside style={{ background: '#FFFFFF', border: '1px solid #DADCE0', borderRadius: '16px', padding: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#202124', margin: 0 }}>Connected Drives</h2>
+              <button
+                onClick={() => { window.location.href = '/api/v1/auth/google/connect'; }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#EEF4FF', color: '#4285F4', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                <Plus size={13} /> Add
+              </button>
+            </div>
+
+            {driveError && (
+              <div style={{ background: '#FDE8E8', border: '1px solid #F5C6C6', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#C5221F', marginBottom: '14px' }}>
+                {driveError}
+              </div>
+            )}
+
+            {driveAccountsLoading && driveAccounts.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#5F6368', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <RefreshCw size={14} className="animate-spin" /> Loading drives…
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {driveAccounts.map(account => {
+                  const usagePct = account.storage?.usage_pct || 0;
+                  return (
+                    <div
+                      key={account.id}
+                      style={{
+                        padding: '14px', background: '#FAFAFA',
+                        border: account.is_default ? '1.5px solid #4285F4' : '1px solid #DADCE0',
+                        borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '10px'
+                      }}
+                    >
+                      {/* Account info */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {account.avatar_url ? (
+                          <img src={account.avatar_url} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ width: '32px', height: '32px', background: '#4285F4', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '13px' }}>
+                            {userInitials(account.display_name || account.account_email)}
+                          </div>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#202124', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {account.account_email}
+                            </span>
+                          </div>
+                          {account.is_default && (
+                            <span style={{ display: 'inline-block', background: '#4285F4', color: 'white', fontSize: '9px', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', marginTop: '2px' }}>
+                              Default
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Individual Storage Filled Percentage Line Bar */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#5F6368', marginBottom: '4px' }}>
+                          <span>{fmtBytes(account.storage.used_bytes)} / {account.storage.limit_bytes ? fmtBytes(account.storage.limit_bytes) : '∞'}</span>
+                          <span style={{ fontWeight: 600, color: usagePct > 85 ? '#EA4335' : '#202124' }}>{usagePct}% filled</span>
+                        </div>
+                        <div style={{ height: '6px', background: '#E0E0E0', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${Math.min(usagePct, 100)}%`, background: usagePct > 85 ? '#EA4335' : '#4285F4', borderRadius: '3px', transition: 'width 0.3s ease' }} />
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                        {!account.is_default && (
+                          <button
+                            onClick={() => handleSetDefaultDrive(account.id)}
+                            style={{ flex: 1, background: '#FFFFFF', border: '1px solid #DADCE0', color: '#5F6368', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                          >
+                            Set Default
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDisconnectDrive(account)}
+                          style={{ flex: account.is_default ? 1 : 'none', background: '#FFFFFF', border: '1px solid #DADCE0', color: '#EA4335', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                        >
+                          Disconnect
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </aside>
+
+          {/* ─── RIGHT COLUMN: Upload Hero Dropzone & Recent Files Table ───────── */}
+          <section style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+
+            {/* ─── Destination Options & Multi-File Hero Drop Zone ─────────────── */}
+            <div style={{ background: '#FFFFFF', border: '1px solid #DADCE0', borderRadius: '16px', padding: '24px' }}>
+
+              {/* Destination picker */}
+              <p style={{ fontSize: '11px', fontWeight: 600, color: '#9AA0A6', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Target Destination for New Files</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+                {[
+                  { value: 'permanent', label: 'Permanent',  sub: 'Google Drive',              icon: <Cloud  size={18} color={uploadIntent === 'permanent'  ? '#4285F4' : '#9AA0A6'} /> },
+                  { value: 'temporary', label: 'Temporary',  sub: 'Cloudflare R2 · auto-deletes', icon: <Clock size={18} color={uploadIntent === 'temporary'  ? '#4285F4' : '#9AA0A6'} /> },
+                ].map(({ value, label, sub, icon }) => (
+                  <button
+                    key={value}
+                    id={`dest-${value}`}
+                    onClick={() => setUploadIntent(value)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '12px',
+                      padding: '12px 16px', borderRadius: '10px', textAlign: 'left',
+                      border:      uploadIntent === value ? '1.5px solid #4285F4' : '1.5px solid #DADCE0',
+                      background:  uploadIntent === value ? '#EEF4FF' : '#FAFAFA',
+                      cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
+                    }}
+                  >
+                    {icon}
+                    <div>
+                      <p style={{ fontSize: '14px', fontWeight: 600, color: '#202124', margin: 0 }}>{label}</p>
+                      <p style={{ fontSize: '12px', color: '#5F6368', margin: 0 }}>{sub}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Target Google Drive Account Selector (Permanent only) */}
+              {uploadIntent === 'permanent' && driveAccounts.length > 0 && (
+                <div style={{ marginBottom: '20px', background: '#FAFAFA', border: '1px solid #DADCE0', borderRadius: '10px', padding: '14px 16px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#5F6368', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Select Target Google Drive:
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {driveAccounts.map(account => (
+                      <label
+                        key={account.id}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '10px 12px', borderRadius: '8px', background: '#FFFFFF',
+                          border: selectedDriveAccountId === account.id ? '1.5px solid #4285F4' : '1px solid #DADCE0',
+                          cursor: 'pointer', transition: 'all 0.15s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <input
+                            type="radio"
+                            name="drive_account_choice"
+                            value={account.id}
+                            checked={selectedDriveAccountId === account.id}
+                            onChange={() => setSelectedDriveAccountId(account.id)}
+                            style={{ accentColor: '#4285F4' }}
+                          />
+                          <span style={{ fontSize: '14px', fontWeight: 500, color: '#202124' }}>{account.account_email}</span>
+                          {account.is_default && (
+                            <span style={{ background: '#E8F0FE', color: '#4285F4', fontSize: '10px', fontWeight: 600, padding: '1px 5px', borderRadius: '4px' }}>
+                              Default
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#5F6368' }}>
+                          {account.storage?.usage_pct || 0}% filled
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Expiry picker (Temporary only) */}
+              {uploadIntent === 'temporary' && (
+                <div style={{ marginBottom: '20px' }}>
+                  <label htmlFor="expiry-select" style={{ fontSize: '13px', fontWeight: 500, color: '#5F6368', display: 'block', marginBottom: '7px' }}>Expires in</label>
+                  <select
+                    id="expiry-select"
+                    value={expiresHours}
+                    onChange={e => setExpiresHours(e.target.value)}
+                    style={{ ...S.input, cursor: 'pointer' }}
+                  >
+                    <option value="1">1 hour</option>
+                    <option value="24">24 hours</option>
+                    <option value="168">7 days</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Multi-File Dropzone Box */}
+              <div
+                id="upload-dropzone"
+                className={dropZoneClass}
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setIsDragging(false); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  if (e.dataTransfer.files) addFilesToQueue(e.dataTransfer.files);
+                }}
+              >
+                <div style={{ width: '64px', height: '64px', background: '#F1F3F4', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Upload size={30} color="#9AA0A6" />
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontWeight: 600, fontSize: '18px', color: '#202124', margin: '0 0 6px' }}>Drop files here to add to queue</p>
+                  <p style={{ fontSize: '14px', color: '#5F6368', margin: 0 }}>or click to browse multiple files from your device</p>
+                </div>
+                <input
+                  type="file"
+                  multiple
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    if (e.target.files) addFilesToQueue(e.target.files);
+                    e.target.value = '';
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* ─── CANCELLABLE UPLOAD QUEUE PANEL ──────────────────────────────── */}
+            {uploadQueue.length > 0 && (
+              <div style={{ background: '#FFFFFF', border: '1px solid #DADCE0', borderRadius: '16px', padding: '20px 24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Upload size={18} color="#4285F4" />
+                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#202124', margin: 0 }}>Upload Queue</h3>
+                    <span style={{ background: '#EEF4FF', color: '#4285F4', fontSize: '12px', fontWeight: 600, padding: '2px 8px', borderRadius: '12px' }}>
+                      {completedCount} / {totalQueueCount} completed {uploadingCount > 0 ? `(${uploadingCount} active)` : ''}
+                    </span>
+                  </div>
+
+                  {/* Speed & Actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+
+                    {/* Concurrency Selector */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#F1F3F4', borderRadius: '8px', padding: '2px 4px' }}>
+                      <Zap size={13} color="#4285F4" style={{ marginLeft: '4px' }} />
+                      {[
+                        { level: 1, label: '1x' },
+                        { level: 3, label: '3x Parallel' },
+                        { level: 5, label: '5x Turbo' },
+                      ].map(({ level, label }) => (
+                        <button
+                          key={level}
+                          onClick={() => setMaxConcurrency(level)}
+                          style={{
+                            padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
+                            border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                            background: maxConcurrency === level ? '#FFFFFF' : 'transparent',
+                            color:      maxConcurrency === level ? '#4285F4' : '#5F6368',
+                            boxShadow:  maxConcurrency === level ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {uploadQueue.some(i => i.status === 'completed' || i.status === 'cancelled') && (
+                      <button
+                        onClick={clearCompletedQueue}
+                        style={{ background: '#FFFFFF', border: '1px solid #DADCE0', color: '#5F6368', borderRadius: '6px', padding: '5px 10px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        Clear Finished
+                      </button>
+                    )}
+                    {uploadQueue.some(i => i.status === 'error' || i.status === 'cancelled') && (
+                      <button
+                        onClick={retryFailedQueue}
+                        style={{ background: '#EEF4FF', border: 'none', color: '#4285F4', borderRadius: '6px', padding: '5px 10px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        Retry Failed
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Overall Queue Progress Bar */}
+                <div style={{ marginBottom: '18px', background: '#FAFAFA', border: '1px solid #DADCE0', borderRadius: '12px', padding: '12px 16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600, color: '#5F6368', marginBottom: '6px' }}>
+                    <span>Overall Progress ({maxConcurrency}x parallel workers)</span>
+                    <span>{fmtBytes(loadedQueueBytes)} of {fmtBytes(totalQueueBytes)} ({overallQueuePct}%)</span>
+                  </div>
+                  <div style={{ height: '8px', background: '#E0E0E0', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${overallQueuePct}%`, background: '#4285F4', borderRadius: '4px', transition: 'width 0.2s ease' }} />
+                  </div>
+                </div>
+
+                {/* Queue Items List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {uploadQueue.map(item => (
+                    <div
+                      key={item.id}
+                      style={{
+                        padding: '12px 16px', background: item.status === 'uploading' ? '#EEF4FF' : '#FAFAFA',
+                        border: item.status === 'uploading' ? '1.5px solid #4285F4' : '1px solid #DADCE0',
+                        borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '6px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                          <FileIcon size={16} color="#5F6368" style={{ flexShrink: 0 }} />
+                          <span style={{ fontSize: '14px', fontWeight: 600, color: '#202124', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.file.name}
+                          </span>
+                          <span style={{ fontSize: '12px', color: '#5F6368', flexShrink: 0 }}>
+                            ({fmtBytes(item.file.size)})
+                          </span>
+                        </div>
+
+                        {/* Status Badges & Controls */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          {item.status === 'pending' && (
+                            <span style={{ background: '#F1F3F4', color: '#5F6368', fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '12px' }}>
+                              Pending
+                            </span>
+                          )}
+                          {item.status === 'uploading' && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#4285F4', color: 'white', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px' }}>
+                              <RefreshCw size={11} className="animate-spin" /> {item.progressPct}%
+                            </span>
+                          )}
+                          {item.status === 'completed' && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#E6F4EA', color: '#137333', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px' }}>
+                              <Check size={12} /> Done
+                            </span>
+                          )}
+                          {item.status === 'cancelled' && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#F1F3F4', color: '#5F6368', fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '12px' }}>
+                              Cancelled
+                            </span>
+                          )}
+                          {item.status === 'error' && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#FDE8E8', color: '#C5221F', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px' }}>
+                              <AlertCircle size={12} /> Failed
+                            </span>
+                          )}
+
+                          {/* Cancel / Remove Cross Icon for ALL statuses (including uploading!) */}
+                          <button
+                            onClick={() => cancelOrRemoveQueueItem(item.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: item.status === 'uploading' ? '#EA4335' : '#9AA0A6' }}
+                            title={item.status === 'uploading' ? 'Cancel active upload' : 'Remove from queue'}
+                          >
+                            <X size={15} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Per-item progress bar when uploading */}
+                      {item.status === 'uploading' && (
+                        <div>
+                          <div style={{ height: '4px', background: '#E0E0E0', borderRadius: '2px', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${item.progressPct}%`, background: '#4285F4', borderRadius: '2px', transition: 'width 0.15s linear' }} />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Error message detail */}
+                      {item.status === 'error' && item.errorMsg && (
+                        <p style={{ fontSize: '12px', color: '#C5221F', margin: 0 }}>
+                          {item.errorMsg}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ─── Files Section: Tabs + Search + File Table ──────────────────── */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+                {/* Tab bar */}
+                <div style={{ display: 'flex', background: '#FFFFFF', border: '1px solid #DADCE0', borderRadius: '10px', padding: '4px', gap: '2px' }}>
+                  {[
+                    { value: 'permanent', label: 'Google Drive' },
+                    { value: 'temporary', label: 'Cloudflare R2' },
+                  ].map(({ value, label }) => (
+                    <button
+                      key={value}
+                      id={`tab-${value}`}
+                      onClick={() => setActiveTab(value)}
+                      style={{
+                        padding: '7px 18px', borderRadius: '7px', fontSize: '14px', fontWeight: 500,
+                        border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                        background: activeTab === value ? '#EEF4FF' : 'transparent',
+                        color:      activeTab === value ? '#4285F4' : '#5F6368',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Search */}
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <Search size={14} style={{ position: 'absolute', left: '12px', color: '#9AA0A6', pointerEvents: 'none' }} />
+                  <input
+                    id="search-files"
+                    type="search"
+                    placeholder="Search files…"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    style={{ ...S.input, paddingLeft: '34px', width: '200px' }}
+                  />
+                </div>
+              </div>
+
+              {/* Table Container */}
+              <div style={{ background: '#FFFFFF', border: '1px solid #DADCE0', borderRadius: '14px', overflow: 'hidden' }}>
+
+                {/* Table Header Bar */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid #DADCE0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#202124' }}>
+                      {activeTab === 'permanent' ? 'Google Drive Files' : 'Cloudflare R2 Files'}
+                    </span>
+                    <span style={{ background: '#F1F3F4', color: '#5F6368', fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px' }}>
+                      {filteredFiles.length}
+                    </span>
+                  </div>
+                  <button
+                    onClick={fetchFiles}
+                    title="Refresh"
+                    style={S.btnIcon}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F1F3F4'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                  >
+                    <RefreshCw size={14} />
+                  </button>
+                </div>
+
+                {/* Empty state */}
+                {filteredFiles.length === 0 ? (
+                  <div style={{ padding: '56px 24px', textAlign: 'center' }}>
+                    <div style={{ width: '48px', height: '48px', background: '#F1F3F4', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+                      {activeTab === 'permanent'
+                        ? <Cloud size={22} color="#9AA0A6" />
+                        : <Clock size={22} color="#9AA0A6" />}
+                    </div>
+                    <p style={{ fontSize: '15px', fontWeight: 500, color: '#5F6368', margin: '0 0 6px' }}>
+                      {searchQuery ? 'No matching files' : `No ${activeTab} files yet`}
+                    </p>
+                    {!searchQuery && (
+                      <p style={{ fontSize: '13px', color: '#9AA0A6', margin: 0 }}>
+                        Drop files above to get started
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', minWidth: '580px', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #F1F3F4' }}>
+                          {[
+                            'Name',
+                            ...(activeTab === 'permanent' ? ['Target Drive'] : []),
+                            'Uploaded',
+                            'Size',
+                            ...(activeTab === 'temporary' ? ['Expires'] : []),
+                            ''
+                          ].map((h, i, arr) => (
+                            <th
+                              key={i}
+                              style={{
+                                padding: '10px 20px',
+                                textAlign: i === arr.length - 1 ? 'right' : 'left',
+                                fontSize: '11px', fontWeight: 600, color: '#9AA0A6',
+                                textTransform: 'uppercase', letterSpacing: '0.05em',
+                              }}
+                            >
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredFiles.map((f, idx) => {
+                          const expiry = fmtExpiry(f.expires_at);
+                          const isExpiringSoon = expiry && expiry.includes('m left');
+                          return (
+                            <tr
+                              key={f.id}
+                              style={{ borderBottom: idx < filteredFiles.length - 1 ? '1px solid #F8F9FA' : 'none', transition: 'background 0.1s' }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#FAFAFA'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            >
+                              {/* Name */}
+                              <td style={{ padding: '12px 20px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <div style={{ width: '34px', height: '34px', background: '#F1F3F4', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    <FileIcon size={15} color="#9AA0A6" />
+                                  </div>
+                                  <span style={{ fontSize: '14px', fontWeight: 500, color: '#202124', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+                                    {f.filename}
+                                  </span>
+                                </div>
+                              </td>
+
+                              {/* Target Drive (permanent only) */}
+                              {activeTab === 'permanent' && (
+                                <td style={{ padding: '12px 20px', fontSize: '13px', color: '#4285F4', fontWeight: 500 }}>
+                                  {f.drive_account_email || 'Google Drive'}
+                                </td>
+                              )}
+
+                              {/* Uploaded */}
+                              <td style={{ padding: '12px 20px', fontSize: '13px', color: '#5F6368' }}>{fmtDate(f.created_at)}</td>
+
+                              {/* Size */}
+                              <td style={{ padding: '12px 20px', fontSize: '13px', color: '#5F6368' }}>{fmtBytes(f.size_bytes)}</td>
+
+                              {/* Expires (temporary only) */}
+                              {activeTab === 'temporary' && (
+                                <td style={{ padding: '12px 20px', fontSize: '13px', fontWeight: isExpiringSoon ? 600 : 400, color: isExpiringSoon ? '#F29900' : '#5F6368' }}>
+                                  {expiry || '—'}
+                                </td>
+                              )}
+
+                              {/* Actions */}
+                              <td style={{ padding: '12px 20px', textAlign: 'right' }}>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
+                                  <button
+                                    onClick={() => handleDownload(f)}
+                                    title="Download"
+                                    style={S.btnIcon}
+                                    onMouseEnter={e => e.currentTarget.style.background = '#F1F3F4'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                                  >
+                                    <Download size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(f)}
+                                    title="Delete"
+                                    style={{ ...S.btnIcon, color: '#EA4335' }}
+                                    onMouseEnter={e => e.currentTarget.style.background = '#FDE8E8'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  );
 }

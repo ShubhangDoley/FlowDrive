@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.security import encrypt_token
 from app.models.user import User
-from app.repositories import token_repo, user_repo
+from app.repositories import drive_account_repo, user_repo
 from app.schemas.auth import UserMe
 from app.storage.google_drive import GoogleDriveStorage
 from app.storage.base import StorageError
@@ -99,12 +99,9 @@ def handle_callback(
       1. Validate the CSRF state
       2. Exchange the authorization code for tokens
       3. Fetch the user's profile from Google
-      4. Upsert the User record
-      5. Encrypt and store the refresh token
-      6. Create (or reuse) the FlowDrive folder in Drive
-      7. Return the User for the caller to set in session
-
-    Raises ValueError on invalid state or missing refresh token.
+      4. Save or update the DriveAccount entry for this user & Google sub
+      5. Create (or reuse) the FlowDrive folder in Drive
+      6. Return the User for the caller to set in session
     """
     # 1. CSRF state validation
     stored_state = session.pop("oauth_state", None)
@@ -141,31 +138,11 @@ def handle_callback(
     display_name = id_info.get("name")
     avatar_url = id_info.get("picture")
 
-    # 4. Upsert the user (or attach Google to an existing password-based account)
+    # 4. Find or attach user
     if attach_to_user_id:
-        # Drive-connect flow: attach Google credentials to the existing user
         user = user_repo.get_by_id(db, attach_to_user_id)
         if user is None:
             raise ValueError("User not found for drive connect.")
-        
-        # Prevent linking if this Google account is already in use by another user
-        existing_sub = user_repo.get_by_google_sub(db, google_sub)
-        if existing_sub and existing_sub.id != user.id:
-            raise ValueError("This Google account is already linked to another FlowDrive user.")
-        
-        existing_email = user_repo.get_by_email(db, email)
-        if existing_email and existing_email.id != user.id:
-            raise ValueError("This email address is already in use by another user.")
-
-        user.google_sub = google_sub
-        user.email = email
-        if display_name and (not user.display_name or user.display_name == user.username):
-            user.display_name = display_name
-        if not user.avatar_url and avatar_url:
-            user.avatar_url = avatar_url
-        user.updated_at = datetime.now(timezone.utc)
-        db.commit()
-        db.refresh(user)
     else:
         user = user_repo.upsert(
             db,
@@ -174,19 +151,50 @@ def handle_callback(
             display_name=display_name,
             avatar_url=avatar_url,
         )
-    logger.info("user_upserted", user_id=str(user.id), email=email)
 
-    # 5. Encrypt and save the refresh token
+    # Update basic profile attributes if missing
+    if not user.email and email:
+        user.email = email
+    if not user.display_name and display_name:
+        user.display_name = display_name
+    if not user.avatar_url and avatar_url:
+        user.avatar_url = avatar_url
+    if not user.google_sub:
+        user.google_sub = google_sub
+    db.commit()
+    db.refresh(user)
+
+    # 5. Save or update DriveAccount
     encrypted_refresh = encrypt_token(credentials.refresh_token)
-    expiry = credentials.expiry  # datetime or None
-    token_repo.save(
-        db,
-        user_id=user.id,
-        encrypted_refresh=encrypted_refresh,
-        access_token_expiry=expiry,
-        provider_metadata={"scopes": list(credentials.scopes) if credentials.scopes else []},
-    )
-    logger.info("oauth_token_saved", user_id=str(user.id))
+    expiry = credentials.expiry
+    metadata = {"scopes": list(credentials.scopes) if credentials.scopes else []}
+
+    existing_account = drive_account_repo.get_by_google_sub(db, user.id, google_sub)
+    if existing_account:
+        existing_account.encrypted_refresh = encrypted_refresh
+        existing_account.access_token_expiry = expiry
+        existing_account.provider_metadata = metadata
+        existing_account.account_email = email or existing_account.account_email
+        existing_account.display_name = display_name or existing_account.display_name
+        existing_account.avatar_url = avatar_url or existing_account.avatar_url
+        drive_account_repo.update_account(db, existing_account)
+        logger.info("drive_account_updated", user_id=str(user.id), email=email)
+    else:
+        existing_accounts = drive_account_repo.get_all_by_user(db, user.id)
+        is_first = len(existing_accounts) == 0
+        drive_account_repo.create(
+            db,
+            user_id=user.id,
+            account_email=email or "connected_drive@gmail.com",
+            account_google_sub=google_sub,
+            encrypted_refresh=encrypted_refresh,
+            display_name=display_name,
+            avatar_url=avatar_url,
+            access_token_expiry=expiry,
+            provider_metadata=metadata,
+            is_default=is_first,
+        )
+        logger.info("drive_account_created", user_id=str(user.id), email=email)
 
     # 6. Create (or reuse) the FlowDrive folder in Drive
     try:
@@ -195,7 +203,6 @@ def handle_callback(
         folder_id = drive.get_or_create_folder(settings.google_drive_folder_name)
         logger.info("drive_folder_ready", user_id=str(user.id), folder_id=folder_id)
     except StorageError as exc:
-        # Non-fatal: folder creation failing shouldn't block login
         logger.warning("drive_folder_create_failed", user_id=str(user.id), error=str(exc))
 
     return user
@@ -203,14 +210,15 @@ def handle_callback(
 
 def get_me(db: Session, user: User) -> UserMe:
     """Return a UserMe schema for the authenticated user, including Drive status."""
-    token = token_repo.get_by_user(db, user.id)
+    accounts = drive_account_repo.get_all_by_user(db, user.id)
     return UserMe(
         id=user.id,
         email=user.email,
         display_name=user.display_name,
         avatar_url=user.avatar_url,
         username=user.username,
-        has_drive_connected=token is not None,
+        has_drive_connected=len(accounts) > 0,
+        drive_account_count=len(accounts),
         created_at=user.created_at,
     )
 
@@ -221,10 +229,6 @@ def register(
     username: str,
     password: str,
 ) -> User:
-    """
-    Register a new user with username + password.
-    Raises ValueError on duplicate username.
-    """
     from passlib.context import CryptContext
 
     pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -250,15 +254,10 @@ def login(
     username_or_email: str,
     password: str,
 ) -> User:
-    """
-    Authenticate a user by username (or email) + password.
-    Raises ValueError if credentials are invalid.
-    """
     from passlib.context import CryptContext
 
     pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-    # Allow login with either username or email
     if "@" in username_or_email:
         user = user_repo.get_by_email(db, username_or_email)
     else:
@@ -275,8 +274,4 @@ def login(
 
 
 def get_drive_connect_url(session: dict) -> str:
-    """
-    Build a Google OAuth URL for connecting Drive to an already-authenticated user.
-    Identical to get_google_auth_url but called when user is already logged in.
-    """
     return get_google_auth_url(session)

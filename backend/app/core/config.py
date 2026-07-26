@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     r2_region: str = "auto"
 
     # ── Uploads & cleanup ─────────────────────────────────────────────────────
-    upload_max_bytes: int = 104_857_600  # 100 MB
+    upload_max_bytes: int = 5_368_709_120  # 5 GB
     temp_cleanup_interval_minutes: int = 15
 
     # ── Derived helpers ───────────────────────────────────────────────────────

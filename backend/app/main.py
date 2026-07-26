@@ -16,13 +16,13 @@ import structlog
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.middleware.session import PureASGISessionMiddleware
 from app.middleware.request_id import RequestIDMiddleware
 from app.routes.auth import router as auth_router
 from app.routes.files import router as files_router
+from app.routes.drive import router as drive_router
 from app.services.cleanup_service import run_cleanup
 
 settings = get_settings()
@@ -67,9 +67,9 @@ def create_app() -> FastAPI:
     # 1. Request ID — must be outermost so request_id is in all logs
     app.add_middleware(RequestIDMiddleware)
 
-    # 2. Session — cookie-based sessions (signed with SESSION_SECRET)
+    # 2. Session — pure ASGI cookie-based sessions (signed with SESSION_SECRET)
     app.add_middleware(
-        SessionMiddleware,
+        PureASGISessionMiddleware,
         secret_key=settings.session_secret,
         session_cookie="flowdrive_session",
         max_age=60 * 60 * 24 * 7,  # 7 days
@@ -80,7 +80,7 @@ def create_app() -> FastAPI:
     # 3. CORS — restrict to the configured frontend origin
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.frontend_url],
+        allow_origins=[settings.frontend_url, "http://localhost:5173", "http://127.0.0.1:5173"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -89,6 +89,7 @@ def create_app() -> FastAPI:
     # ── Routers ────────────────────────────────────────────────────────────────
     app.include_router(auth_router)
     app.include_router(files_router)
+    app.include_router(drive_router)
 
     # ── Health check ───────────────────────────────────────────────────────────
     @app.get("/health", tags=["ops"], summary="Health check")
