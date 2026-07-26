@@ -76,12 +76,16 @@ class GoogleDriveStorage(StorageAdapter):
     Requires a valid (decrypted) refresh token for the user.
     The Drive service object is built once per adapter instance.
     """
-
     def __init__(self, refresh_token: str) -> None:
         try:
             self._creds = _build_credentials(refresh_token)
             self._service = build("drive", "v3", credentials=self._creds, cache_discovery=False)
         except Exception as exc:
+            if "invalid_grant" in str(exc):
+                raise StorageError(
+                    "Google Drive token has expired or been revoked by Google. "
+                    "Please re-authorize by clicking 'Re-connect Google Drive Account'."
+                ) from exc
             raise StorageError(f"Could not initialise Google Drive client: {exc}") from exc
 
     # ── Folder helpers ─────────────────────────────────────────────────────────
