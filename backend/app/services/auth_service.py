@@ -223,21 +223,32 @@ def get_me(db: Session, user: User) -> UserMe:
     )
 
 
+def _hash_password(password: str) -> str:
+    import hashlib
+    from passlib.context import CryptContext
+    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    prehashed = hashlib.sha256((password or "").encode("utf-8")).hexdigest()
+    return pwd_ctx.hash(prehashed)
+
+
+def _verify_password(password: str, hashed_password: str) -> bool:
+    import hashlib
+    from passlib.context import CryptContext
+    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    prehashed = hashlib.sha256((password or "").encode("utf-8")).hexdigest()
+    return pwd_ctx.verify(prehashed, hashed_password)
+
+
 def register(
     db: Session,
     *,
     username: str,
     password: str,
 ) -> User:
-    from passlib.context import CryptContext
-
-    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
     if user_repo.get_by_username(db, username):
         raise ValueError(f"Username '{username}' is already taken.")
 
-    safe_password = password[:72] if password else ""
-    password_hash = pwd_ctx.hash(safe_password)
+    password_hash = _hash_password(password)
     user = user_repo.create_local(
         db,
         username=username,
@@ -255,10 +266,6 @@ def login(
     username_or_email: str,
     password: str,
 ) -> User:
-    from passlib.context import CryptContext
-
-    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
     if "@" in username_or_email:
         user = user_repo.get_by_email(db, username_or_email)
     else:
@@ -269,8 +276,7 @@ def login(
     if not user.password_hash:
         raise ValueError("This account was created via Google. Please log in with Google.")
 
-    safe_password = password[:72] if password else ""
-    if not pwd_ctx.verify(safe_password, user.password_hash):
+    if not _verify_password(password, user.password_hash):
         raise ValueError("Incorrect password. Please check your password.")
 
     logger.info("user_logged_in_local", user_id=str(user.id))
