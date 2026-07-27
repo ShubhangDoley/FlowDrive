@@ -79,6 +79,27 @@ def google_login(request: Request):
     )
 
 
+@router.get("/google/connect-url", summary="Get Google OAuth authorization URL")
+def google_connect_url(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns JSON { "url": "https://accounts.google.com/..." } for authenticated users.
+    Ensures credentials cookie is sent via fetch API.
+    """
+    settings = get_settings()
+    if not settings.google_configured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google OAuth is not configured on this server.",
+        )
+    request.session["connecting_drive_for"] = str(current_user.id)
+    auth_url = auth_service.get_drive_connect_url(request.session)
+    logger.info("google_connect_url_generated", user_id=str(current_user.id))
+    return {"url": auth_url}
+
+
 @router.get("/google/connect", summary="Connect Google Drive to existing account")
 def google_connect(
     request: Request,
@@ -92,17 +113,17 @@ def google_connect(
     user_id: str | None = request.session.get("user_id")
     if not user_id:
         logger.warning("google_connect_unauthenticated")
-        return RedirectResponse(url=f"{settings.frontend_url}/?error=not_authenticated")
+        return RedirectResponse(url=f"{settings.effective_frontend_url}/?error=not_authenticated")
 
     from app.repositories.user_repo import get_by_id
     user = get_by_id(db, user_id)
     if not user:
         request.session.clear()
-        return RedirectResponse(url=f"{settings.frontend_url}/?error=not_authenticated")
+        return RedirectResponse(url=f"{settings.effective_frontend_url}/?error=not_authenticated")
 
     if not settings.google_configured:
         logger.warning("google_connect_not_configured")
-        return RedirectResponse(url=f"{settings.frontend_url}/?error=google_not_configured")
+        return RedirectResponse(url=f"{settings.effective_frontend_url}/?error=google_not_configured")
 
     # Mark this as a drive-connect flow
     request.session["connecting_drive_for"] = str(user.id)
@@ -127,7 +148,7 @@ def google_callback(
     if error or not code or not state:
         logger.warning("oauth_callback_cancelled_or_missing", error=error)
         return RedirectResponse(
-            url=f"{settings.frontend_url}/?error=oauth_failed",
+            url=f"{settings.effective_frontend_url}/?error=oauth_failed",
             status_code=status.HTTP_302_FOUND,
         )
 
@@ -144,20 +165,20 @@ def google_callback(
     except ValueError as exc:
         logger.warning("oauth_callback_failed", error=str(exc))
         return RedirectResponse(
-            url=f"{settings.frontend_url}/?error=oauth_failed",
+            url=f"{settings.effective_frontend_url}/?error=oauth_failed",
             status_code=status.HTTP_302_FOUND,
         )
     except Exception as exc:
         logger.error("oauth_callback_error", error=str(exc), exc_info=True)
         return RedirectResponse(
-            url=f"{settings.frontend_url}/?error=server_error",
+            url=f"{settings.effective_frontend_url}/?error=server_error",
             status_code=status.HTTP_302_FOUND,
         )
 
     request.session["user_id"] = str(user.id)
     logger.info("user_logged_in", user_id=str(user.id), email=user.email)
     return RedirectResponse(
-        url=f"{settings.frontend_url}/",
+        url=f"{settings.effective_frontend_url}/",
         status_code=status.HTTP_302_FOUND,
     )
 

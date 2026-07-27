@@ -43,7 +43,14 @@ class Settings(BaseSettings):
     upload_max_bytes: int = 5_368_709_120  # 5 GB
     temp_cleanup_interval_minutes: int = 15
 
-    # ── Derived helpers ───────────────────────────────────────────────────────
+    @property
+    def effective_frontend_url(self) -> str:
+        url = self.frontend_url or "https://flowdrive-80s.pages.dev"
+        url = url.rstrip("/")
+        if not url.startswith("http://") and not url.startswith("https://"):
+            return f"https://{url}"
+        return url
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
