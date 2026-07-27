@@ -5,6 +5,13 @@ import {
 } from 'lucide-react';
 import Prism from './Prism';
 
+const GithubIcon = ({ size = 16, color = '#38bdf8' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
+    <path d="M9 18c-4.51 2-5-2-7-2" />
+  </svg>
+);
+
 // ─── API helper ───────────────────────────────────────────────────────────────
 const API = {
   get:      (path)           => fetch(path, { credentials: 'include' }),
@@ -555,7 +562,17 @@ export default function App() {
     return (
       <div className="space-canvas" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', minHeight: '100vh', position: 'relative' }}>
         <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-          <Prism animationType="rotate" timeScale={0.5} height={3.5} baseWidth={5.5} scale={3.6} hueShift={0} colorFrequency={1} noise={0} glow={1} />
+          <Prism
+            animationType="3drotate"
+            timeScale={1.2}
+            height={2.3}
+            baseWidth={4.4}
+            scale={2.5}
+            hueShift={0}
+            colorFrequency={4}
+            noise={0.8}
+            glow={0.4}
+          />
         </div>
         <div style={{ background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)', borderRadius: '16px', width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 30px rgba(99, 102, 241, 0.5)', zIndex: 1 }}>
           <Orbit color="white" size={32} />
@@ -573,7 +590,17 @@ export default function App() {
     return (
       <div className="space-canvas" style={{ display: 'flex', minHeight: '100vh', position: 'relative', overflow: 'hidden', alignItems: 'center' }}>
         <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-          <Prism animationType="rotate" timeScale={0.5} height={3.5} baseWidth={5.5} scale={3.6} hueShift={0} colorFrequency={1} noise={0} glow={1} />
+          <Prism
+            animationType="3drotate"
+            timeScale={1.2}
+            height={2.3}
+            baseWidth={4.4}
+            scale={2.5}
+            hueShift={0}
+            colorFrequency={4}
+            noise={0.8}
+            glow={0.4}
+          />
         </div>
 
         {/* Left brand panel — desktop only */}
@@ -639,7 +666,7 @@ export default function App() {
 
             {/* Error banner */}
             {error && (
-              <div style={{ background: 'rgba(239, 68, 68, 0.15)',  border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '10px', padding: '12px 16px', fontSize: '14px', color: '#fca5a5', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div className="error-card" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <AlertCircle size={18} style={{ flexShrink: 0 }} />
                 <span>{error === 'oauth_failed' ? 'Google sign-in failed. Please try again.' : error}</span>
               </div>
@@ -700,7 +727,7 @@ export default function App() {
               </form>
             )}
 
-            <p style={{ fontSize: '13px', color: '#64748b', textAlign: 'center', marginTop: '28px' }}>
+            <p style={{ fontSize: '13px', color: '#64748b', textAlign: 'center', marginTop: '24px' }}>
               By continuing you agree to FlowDrive's terms of service.
             </p>
           </div>
@@ -714,7 +741,17 @@ export default function App() {
     return (
       <div className="space-canvas" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', position: 'relative' }}>
         <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-          <Prism animationType="rotate" timeScale={0.5} height={3.5} baseWidth={5.5} scale={3.6} hueShift={0} colorFrequency={1} noise={0} glow={1} />
+          <Prism
+            animationType="3drotate"
+            timeScale={1.2}
+            height={2.3}
+            baseWidth={4.4}
+            scale={2.5}
+            hueShift={0}
+            colorFrequency={4}
+            noise={0.8}
+            glow={0.4}
+          />
         </div>
         <div className="paper-card" style={{ padding: '52px 44px', width: '100%', maxWidth: '500px', textAlign: 'center', position: 'relative', zIndex: 1 }}>
           <div style={{ background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)', borderRadius: '16px', width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', boxShadow: '0 0 25px rgba(99, 102, 241, 0.5)' }}>
@@ -767,15 +804,15 @@ export default function App() {
     <div className="space-canvas" style={{ color: '#f8fafc', position: 'relative' }}>
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
         <Prism
-          animationType="rotate"
-          timeScale={0.5}
-          height={3.5}
-          baseWidth={5.5}
-          scale={3.6}
+          animationType="3drotate"
+          timeScale={1.2}
+          height={2.3}
+          baseWidth={4.4}
+          scale={2.5}
           hueShift={0}
-          colorFrequency={1}
-          noise={0}
-          glow={1}
+          colorFrequency={4}
+          noise={0.8}
+          glow={0.4}
         />
       </div>
       
@@ -916,8 +953,9 @@ export default function App() {
             <span style={{ fontWeight: 800, fontSize: '20px', letterSpacing: '-0.5px' }} className="text-gradient">FlowDrive</span>
           </div>
 
-          {/* User + logout — locked to top-right */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginLeft: 'auto' }}>
+          {/* User badge, GitHub repo button & logout — locked to top-right */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
+            {/* Standalone User Badge Pill */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255, 255, 255, 0.06)', padding: '4px 14px 4px 6px', borderRadius: '9999px', border: '1px solid rgba(255, 255, 255, 0.14)' }}>
               <div style={{ width: '30px', height: '30px', background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: '#FFFFFF', flexShrink: 0 }}>
                 {userInitials(user?.username)}
@@ -925,6 +963,40 @@ export default function App() {
               <span style={{ fontSize: '14px', color: '#f8fafc', fontWeight: 600 }}>{user?.username}</span>
             </div>
 
+            {/* Standalone GitHub Link Button - perfectly centered glass circle */}
+            <a
+              href="https://github.com/ShubhangDoley/FlowDrive"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="View FlowDrive Repository on GitHub"
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.14)',
+                color: '#38bdf8',
+                textDecoration: 'none',
+                transition: 'all 0.2s ease',
+                boxSizing: 'border-box',
+                flexShrink: 0
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.14)';
+              }}
+            >
+              <GithubIcon size={18} color="#38bdf8" />
+            </a>
+
+            {/* Standalone Logout Button */}
             <button
               id="logout-btn"
               onClick={handleLogout}
@@ -1025,8 +1097,9 @@ export default function App() {
             </div>
 
             {driveError && (
-              <div style={{ background: 'rgba(239, 68, 68, 0.15)',  border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#fca5a5', marginBottom: '16px' }}>
-                {driveError}
+              <div className="error-card" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>{driveError}</span>
               </div>
             )}
 
@@ -1141,225 +1214,232 @@ export default function App() {
 
             {/* ─── Destination Options & Multi-File Hero Drop Zone ─────────────── */}
             <div className="paper-card" style={{ padding: '28px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'stretch' }} className="grid-cols-1 md:grid-cols-2">
 
-              {/* Destination picker */}
-              <p style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Target Destination for New Files</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
-                {[
-                  { value: 'permanent', label: 'Permanent Storage',  sub: 'Google Drive Space', icon: <Cloud  size={20} color={uploadIntent === 'permanent'  ? '#FFFFFF' : '#94a3b8'} /> },
-                  { value: 'temporary', label: 'Temporary Share',    sub: 'Cloudflare R2 · Auto-deletes', icon: <Clock size={20} color={uploadIntent === 'temporary'  ? '#FFFFFF' : '#94a3b8'} /> },
-                ].map(({ value, label, sub, icon }) => (
-                  <button
-                    key={value}
-                    id={`dest-${value}`}
-                    onClick={() => setUploadIntent(value)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '14px', height: '64px',
-                      padding: '12px 18px', borderRadius: '12px', textAlign: 'left',
-                      border:      uploadIntent === value ? '1.5px solid #6366f1' : '1px solid rgba(255, 255, 255, 0.12)',
-                      background:  uploadIntent === value ? 'rgba(99, 102, 241, 0.22)' : 'rgba(255, 255, 255, 0.03)',
-                      color:       uploadIntent === value ? '#FFFFFF' : '#f8fafc',
-                      cursor: 'pointer', transition: 'all 0.2s ease', fontFamily: 'inherit',
-                      boxSizing: 'border-box', boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.1)'
-                    }}
-                  >
-                    <div style={{ flexShrink: 0 }}>{icon}</div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <p style={{ fontSize: '14px', fontWeight: 700, color: uploadIntent === value ? '#FFFFFF' : '#f8fafc', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</p>
-                      <p style={{ fontSize: '12px', color: uploadIntent === value ? '#FFFFFF' : '#94a3b8', opacity: uploadIntent === value ? 0.85 : 1, margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</p>
+                {/* LEFT HALF: Destination Selection & Target Drive / Expiry Options */}
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <p style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Target Destination for New Files</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                      {[
+                        { value: 'permanent', label: 'Permanent Storage',  sub: 'Google Drive Space', icon: <Cloud  size={18} color={uploadIntent === 'permanent'  ? '#FFFFFF' : '#94a3b8'} /> },
+                        { value: 'temporary', label: 'Temporary Share',    sub: 'Cloudflare R2 · Auto-deletes', icon: <Clock size={18} color={uploadIntent === 'temporary'  ? '#FFFFFF' : '#94a3b8'} /> },
+                      ].map(({ value, label, sub, icon }) => (
+                        <button
+                          key={value}
+                          id={`dest-${value}`}
+                          onClick={() => setUploadIntent(value)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '12px', height: '60px',
+                            padding: '10px 14px', borderRadius: '12px', textAlign: 'left',
+                            border:      uploadIntent === value ? '1.5px solid #6366f1' : '1px solid rgba(255, 255, 255, 0.12)',
+                            background:  uploadIntent === value ? 'rgba(99, 102, 241, 0.22)' : 'rgba(255, 255, 255, 0.03)',
+                            color:       uploadIntent === value ? '#FFFFFF' : '#f8fafc',
+                            cursor: 'pointer', transition: 'all 0.2s ease', fontFamily: 'inherit',
+                            boxSizing: 'border-box', boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                          }}
+                        >
+                          <div style={{ flexShrink: 0 }}>{icon}</div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <p style={{ fontSize: '13px', fontWeight: 700, color: uploadIntent === value ? '#FFFFFF' : '#f8fafc', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</p>
+                            <p style={{ fontSize: '11px', color: uploadIntent === value ? '#FFFFFF' : '#94a3b8', opacity: uploadIntent === value ? 0.85 : 1, margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</p>
+                          </div>
+                        </button>
+                      ))}
                     </div>
-                  </button>
-                ))}
-              </div>
 
-              {/* Target Google Drive Account Selector (Permanent only) */}
-              {uploadIntent === 'permanent' && driveAccounts.length > 0 && (
-                <div style={{ marginBottom: '24px', background: 'rgba(255, 255, 255, 0.03)',  border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px', padding: '16px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc', display: 'block', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Select Target Google Drive:
-                  </label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {driveAccounts.map(account => (
-                      <label
-                        key={account.id}
-                        style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '46px',
-                          padding: '0 14px', borderRadius: '8px', background: 'rgba(15, 25, 48, 0.5)',
-                           
-                          border: selectedDriveAccountId === account.id ? '1.5px solid #6366f1' : '1px solid rgba(255, 255, 255, 0.12)',
-                          cursor: 'pointer', transition: 'all 0.2s ease', boxSizing: 'border-box'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                          <input
-                            type="radio"
-                            name="drive_account_choice"
-                            value={account.id}
-                            checked={selectedDriveAccountId === account.id}
-                            onChange={() => setSelectedDriveAccountId(account.id)}
-                            style={{ accentColor: '#6366f1', flexShrink: 0 }}
-                          />
-                          <span style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{account.account_email}</span>
-                          {account.is_default && (
-                            <span style={{ background: 'rgba(99, 102, 241, 0.25)', color: '#38bdf8', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>
-                              Default
-                            </span>
-                          )}
-                        </div>
-                        <span style={{ fontSize: '12px', color: '#94a3b8', flexShrink: 0, marginLeft: '12px' }}>
-                          {account.storage?.usage_pct || 0}% filled
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Expiry picker (Temporary only) - Glassmorphic Dropdown */}
-              {uploadIntent === 'temporary' && (
-                <div style={{ marginBottom: '24px', position: 'relative' }}>
-                  <label htmlFor="expiry-select" style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Auto-Deletion Period</label>
-                  
-                  {/* Glass Trigger Button */}
-                  <div
-                    onClick={() => setIsExpiryDropdownOpen(prev => !prev)}
-                    style={{
-                      ...S.input,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                      background: 'rgba(15, 25, 48, 0.45)',
-                      border: isExpiryDropdownOpen ? '1px solid #6366f1' : '1px solid rgba(255, 255, 255, 0.16)',
-                      boxShadow: isExpiryDropdownOpen ? '0 0 15px rgba(99, 102, 241, 0.3)' : 'none',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Clock size={16} color="#38bdf8" />
-                      <span style={{ fontWeight: 600, color: '#f8fafc' }}>
-                        {expiresHours === '1' && '1 hour (60 minutes)'}
-                        {expiresHours === '24' && '24 hours (1 day)'}
-                        {expiresHours === '168' && '7 days (1 week)'}
-                      </span>
-                    </div>
-                    <ChevronDown size={16} color="#a5b4fc" style={{ transform: isExpiryDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
-                  </div>
-
-                  {/* Hidden select for accessibility & test bindings */}
-                  <select
-                    id="expiry-select"
-                    value={expiresHours}
-                    onChange={e => setExpiresHours(e.target.value)}
-                    style={{ display: 'none' }}
-                  >
-                    <option value="1">1 hour</option>
-                    <option value="24">24 hours</option>
-                    <option value="168">7 days</option>
-                  </select>
-
-                  {/* Floating Glassmorphic Dropdown Card Menu */}
-                  {isExpiryDropdownOpen && (
-                    <>
-                      {/* Invisible backdrop to dismiss on click outside */}
-                      <div
-                        style={{ position: 'fixed', inset: 0, zIndex: 90 }}
-                        onClick={() => setIsExpiryDropdownOpen(false)}
-                      />
-                      <div
-                        className="paper-card"
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          right: 0,
-                          marginTop: '6px',
-                          zIndex: 100,
-                          padding: '6px',
-                          background: 'rgba(15, 25, 48, 0.85)',
-                          backdropFilter: 'blur(24px) saturate(190%)',
-                          WebkitBackdropFilter: 'blur(24px) saturate(190%)',
-                          border: '1px solid rgba(255, 255, 255, 0.2)',
-                          boxShadow: '0 16px 40px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
-                          borderRadius: '12px',
-                        }}
-                      >
-                        {[
-                          { value: '1', label: '1 hour', desc: 'Auto-deletes in 60 minutes' },
-                          { value: '24', label: '24 hours', desc: 'Auto-deletes tomorrow' },
-                          { value: '168', label: '7 days', desc: 'Auto-deletes in 1 week' },
-                        ].map((opt) => {
-                          const isSelected = expiresHours === opt.value;
-                          return (
-                            <div
-                              key={opt.value}
-                              onClick={() => {
-                                setExpiresHours(opt.value);
-                                setIsExpiryDropdownOpen(false);
-                              }}
+                    {/* Target Google Drive Account Selector (Permanent only) */}
+                    {uploadIntent === 'permanent' && driveAccounts.length > 0 && (
+                      <div style={{ background: 'rgba(255, 255, 255, 0.03)',  border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px', padding: '14px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: 700, color: '#f8fafc', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Select Target Google Drive:
+                        </label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '150px', overflowY: 'auto' }}>
+                          {driveAccounts.map(account => (
+                            <label
+                              key={account.id}
                               style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: '10px 14px',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                                background: isSelected ? 'rgba(99, 102, 241, 0.25)' : 'transparent',
-                                color: isSelected ? '#FFFFFF' : '#f8fafc',
-                                border: isSelected ? '1px solid rgba(165, 180, 252, 0.3)' : '1px solid transparent',
-                              }}
-                              onMouseEnter={e => {
-                                if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-                              }}
-                              onMouseLeave={e => {
-                                if (!isSelected) e.currentTarget.style.background = 'transparent';
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '42px',
+                                padding: '0 12px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.05)',
+                                border: selectedDriveAccountId === account.id ? '1.5px solid #6366f1' : '1px solid rgba(255, 255, 255, 0.12)',
+                                cursor: 'pointer', transition: 'all 0.2s ease', boxSizing: 'border-box'
                               }}
                             >
-                              <div>
-                                <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>{opt.label}</p>
-                                <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0' }}>{opt.desc}</p>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                                <input
+                                  type="radio"
+                                  name="drive_account_choice"
+                                  value={account.id}
+                                  checked={selectedDriveAccountId === account.id}
+                                  onChange={() => setSelectedDriveAccountId(account.id)}
+                                  style={{ accentColor: '#6366f1', flexShrink: 0 }}
+                                />
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={account.account_email}>{account.account_email}</span>
+                                {account.is_default && (
+                                  <span style={{ background: 'rgba(99, 102, 241, 0.25)', color: '#38bdf8', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>
+                                    Default
+                                  </span>
+                                )}
                               </div>
-                              {isSelected && <Check size={16} color="#38bdf8" />}
-                            </div>
-                          );
-                        })}
+                              <span style={{ fontSize: '11px', color: '#94a3b8', flexShrink: 0, marginLeft: '8px' }}>
+                                {account.storage?.usage_pct || 0}%
+                              </span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    </>
-                  )}
-                </div>
-              )}
+                    )}
 
-              {/* Multi-File Dropzone Box */}
-              <div
-                id="upload-dropzone"
-                className={dropZoneClass}
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setIsDragging(false); }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setIsDragging(false);
-                  if (e.dataTransfer.files) addFilesToQueue(e.dataTransfer.files);
-                }}
-              >
-                <div style={{ width: '56px', height: '56px', background: 'rgba(99, 102, 241, 0.25)',  border: '1px solid rgba(165, 180, 252, 0.35)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
-                  <Upload size={26} />
+                    {/* Expiry picker (Temporary only) - Glassmorphic Dropdown */}
+                    {uploadIntent === 'temporary' && (
+                      <div style={{ position: 'relative' }}>
+                        <label htmlFor="expiry-select" style={{ fontSize: '11px', fontWeight: 700, color: '#f8fafc', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Auto-Deletion Period</label>
+                        
+                        {/* Glass Trigger Button */}
+                        <div
+                          onClick={() => setIsExpiryDropdownOpen(prev => !prev)}
+                          style={{
+                            ...S.input,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justify: 'space-between',
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                            background: 'rgba(255, 255, 255, 0.08)',
+                            border: isExpiryDropdownOpen ? '1px solid #6366f1' : '1px solid rgba(255, 255, 255, 0.16)',
+                            boxShadow: isExpiryDropdownOpen ? '0 0 15px rgba(99, 102, 241, 0.3)' : 'none',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Clock size={16} color="#38bdf8" />
+                            <span style={{ fontWeight: 600, color: '#f8fafc' }}>
+                              {expiresHours === '1' && '1 hour (60 minutes)'}
+                              {expiresHours === '24' && '24 hours (1 day)'}
+                              {expiresHours === '168' && '7 days (1 week)'}
+                            </span>
+                          </div>
+                          <ChevronDown size={16} color="#a5b4fc" style={{ transform: isExpiryDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
+                        </div>
+
+                        {/* Hidden select for accessibility & test bindings */}
+                        <select
+                          id="expiry-select"
+                          value={expiresHours}
+                          onChange={e => setExpiresHours(e.target.value)}
+                          style={{ display: 'none' }}
+                        >
+                          <option value="1">1 hour</option>
+                          <option value="24">24 hours</option>
+                          <option value="168">7 days</option>
+                        </select>
+
+                        {/* Floating Glassmorphic Dropdown Card Menu */}
+                        {isExpiryDropdownOpen && (
+                          <>
+                            {/* Invisible backdrop to dismiss on click outside */}
+                            <div
+                              style={{ position: 'fixed', inset: 0, zIndex: 90 }}
+                              onClick={() => setIsExpiryDropdownOpen(false)}
+                            />
+                            <div
+                              className="paper-card"
+                              style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                right: 0,
+                                marginTop: '6px',
+                                zIndex: 100,
+                                padding: '6px',
+                                background: 'rgba(20, 30, 50, 0.92)',
+                                backdropFilter: 'blur(24px) saturate(190%)',
+                                WebkitBackdropFilter: 'blur(24px) saturate(190%)',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                boxShadow: '0 16px 40px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
+                                borderRadius: '12px',
+                              }}
+                            >
+                              {[
+                                { value: '1', label: '1 hour', desc: 'Auto-deletes in 60 minutes' },
+                                { value: '24', label: '24 hours', desc: 'Auto-deletes tomorrow' },
+                                { value: '168', label: '7 days', desc: 'Auto-deletes in 1 week' },
+                              ].map((opt) => {
+                                const isSelected = expiresHours === opt.value;
+                                return (
+                                  <div
+                                    key={opt.value}
+                                    onClick={() => {
+                                      setExpiresHours(opt.value);
+                                      setIsExpiryDropdownOpen(false);
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justify: 'space-between',
+                                      padding: '10px 14px',
+                                      borderRadius: '8px',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease',
+                                      background: isSelected ? 'rgba(99, 102, 241, 0.25)' : 'transparent',
+                                      color: isSelected ? '#FFFFFF' : '#f8fafc',
+                                      border: isSelected ? '1px solid rgba(165, 180, 252, 0.3)' : '1px solid transparent',
+                                    }}
+                                    onMouseEnter={e => {
+                                      if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                                    }}
+                                    onMouseLeave={e => {
+                                      if (!isSelected) e.currentTarget.style.background = 'transparent';
+                                    }}
+                                  >
+                                    <div>
+                                      <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>{opt.label}</p>
+                                      <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0' }}>{opt.desc}</p>
+                                    </div>
+                                    {isSelected && <Check size={16} color="#38bdf8" />}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ fontWeight: 700, fontSize: '18px', color: '#f8fafc', margin: '0 0 4px' }}>Drop files to upload to space</p>
-                  <p style={{ fontSize: '14px', color: '#94a3b8', margin: 0 }}>or click to browse multiple files from your computer</p>
-                </div>
-                <input
-                  type="file"
-                  multiple
-                  ref={fileInputRef}
-                  style={{ display: 'none' }}
-                  onChange={e => {
-                    if (e.target.files) addFilesToQueue(e.target.files);
-                    e.target.value = '';
+
+                {/* RIGHT HALF: Drag & Drop Hero Zone */}
+                <div
+                  id="upload-dropzone"
+                  className={dropZoneClass}
+                  style={{ minHeight: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', boxSizing: 'border-box' }}
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setIsDragging(false); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    if (e.dataTransfer.files) addFilesToQueue(e.dataTransfer.files);
                   }}
-                />
+                >
+                  <div style={{ width: '56px', height: '56px', background: 'rgba(99, 102, 241, 0.25)',  border: '1px solid rgba(165, 180, 252, 0.35)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', marginBottom: '12px' }}>
+                    <Upload size={26} />
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontWeight: 700, fontSize: '17px', color: '#f8fafc', margin: '0 0 4px' }}>Drop files to upload to space</p>
+                    <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0 }}>or click to browse multiple files from your computer</p>
+                  </div>
+                  <input
+                    type="file"
+                    multiple
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      if (e.target.files) addFilesToQueue(e.target.files);
+                      e.target.value = '';
+                    }}
+                  />
+                </div>
+
               </div>
             </div>
 

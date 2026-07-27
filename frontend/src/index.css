@@ -190,7 +190,108 @@ html, body {
 }
 
 .paper-card-sm:hover {
-  border-color: rgba(99, 102, 241, 0.35);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Glassmorphic Warning & Error Card Themes */
+.warning-card,
+.error-card {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s ease;
+  padding: 14px 18px;
+  box-sizing: border-box;
+}
+
+.warning-card {
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(253, 230, 138, 0.4),
+    inset 0 -1px 0 rgba(245, 158, 11, 0.1);
+  color: #fef08a;
+}
+
+.warning-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(253, 230, 138, 0.8),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.warning-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(253, 230, 138, 0.8),
+    transparent,
+    rgba(245, 158, 11, 0.3)
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.error-card {
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(254, 202, 202, 0.4),
+    inset 0 -1px 0 rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+}
+
+.error-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(254, 202, 202, 0.8),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.error-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(254, 202, 202, 0.8),
+    transparent,
+    rgba(239, 68, 68, 0.3)
+  );
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Gradient Text Effect */
