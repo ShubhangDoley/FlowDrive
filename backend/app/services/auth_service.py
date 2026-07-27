@@ -223,23 +223,24 @@ def get_me(db: Session, user: User) -> UserMe:
     )
 
 
-pwd_ctx = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__truncate_error=False,
-)
-
-
 def _hash_password(password: str) -> str:
+    import bcrypt
     import hashlib
-    prehashed = hashlib.sha256((password or "").encode("utf-8")).hexdigest()
-    return pwd_ctx.hash(prehashed)
+    prehashed = hashlib.sha256((password or "").encode("utf-8")).hexdigest().encode("utf-8")
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(prehashed, salt).decode("utf-8")
 
 
 def _verify_password(password: str, hashed_password: str) -> bool:
+    import bcrypt
     import hashlib
-    prehashed = hashlib.sha256((password or "").encode("utf-8")).hexdigest()
-    return pwd_ctx.verify(prehashed, hashed_password)
+    if not hashed_password:
+        return False
+    try:
+        prehashed = hashlib.sha256((password or "").encode("utf-8")).hexdigest().encode("utf-8")
+        return bcrypt.checkpw(prehashed, hashed_password.encode("utf-8"))
+    except Exception:
+        return False
 
 
 def register(
