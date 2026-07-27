@@ -68,13 +68,16 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestIDMiddleware)
 
     # 2. Session — pure ASGI cookie-based sessions (signed with SESSION_SECRET)
+    cookie_same_site = "none" if settings.is_production else "lax"
+    cookie_https_only = True if settings.is_production else settings.cookie_secure
+
     app.add_middleware(
         PureASGISessionMiddleware,
         secret_key=settings.session_secret,
         session_cookie="flowdrive_session",
         max_age=60 * 60 * 24 * 7,  # 7 days
-        https_only=settings.cookie_secure,
-        same_site="lax",
+        https_only=cookie_https_only,
+        same_site=cookie_same_site,
     )
 
     # 3. CORS — restrict to configured frontend origin + Cloudflare Pages

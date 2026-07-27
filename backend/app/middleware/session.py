@@ -61,14 +61,16 @@ class PureASGISessionMiddleware:
                 if scope.get("session"):
                     try:
                         signed = self.serializer.dumps(scope["session"])
+                        same_site_val = self.same_site.capitalize()
+                        is_secure = self.https_only or same_site_val.lower() == "none"
                         cookie_parts = [
                             f"{self.session_cookie}={signed}",
                             "Path=/",
                             f"Max-Age={self.max_age}",
                             "HttpOnly",
-                            f"SameSite={self.same_site.capitalize()}",
+                            f"SameSite={same_site_val}",
                         ]
-                        if self.https_only:
+                        if is_secure:
                             cookie_parts.append("Secure")
                         cookie_str = "; ".join(cookie_parts)
                         headers = list(message.get("headers", []))
@@ -77,7 +79,18 @@ class PureASGISessionMiddleware:
                     except Exception:
                         pass
                 elif cookie_val and not scope.get("session"):
-                    cookie_str = f"{self.session_cookie}=; Path=/; Max-Age=0; HttpOnly; SameSite={self.same_site.capitalize()}"
+                    same_site_val = self.same_site.capitalize()
+                    is_secure = self.https_only or same_site_val.lower() == "none"
+                    cookie_parts = [
+                        f"{self.session_cookie}=",
+                        "Path=/",
+                        "Max-Age=0",
+                        "HttpOnly",
+                        f"SameSite={same_site_val}",
+                    ]
+                    if is_secure:
+                        cookie_parts.append("Secure")
+                    cookie_str = "; ".join(cookie_parts)
                     headers = list(message.get("headers", []))
                     headers.append((b"set-cookie", cookie_str.encode("utf-8")))
                     message["headers"] = headers
