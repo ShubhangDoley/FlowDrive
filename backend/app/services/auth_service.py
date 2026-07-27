@@ -52,37 +52,36 @@ def _build_flow() -> Flow:
     )
 
 
-def get_google_auth_url(session: dict) -> str:
+def _get_state_serializer():
+    from itsdangerous import URLSafeSerializer
+    settings = get_settings()
+    return URLSafeSerializer(settings.session_secret, salt="google-oauth-state")
+
+
+def get_google_auth_url(session: dict, user_id: str | None = None) -> str:
     """
-    Generate a Google OAuth redirect URL.
-    Stores a CSRF state token and PKCE code_verifier in the session
-    for validation in the callback.
-    Returns the URL to redirect the user to.
+    Generate a Google OAuth redirect URL with a signed CSRF state token.
+    The signed state token contains the user_id so cross-domain redirects work
+    even if the session cookie is omitted by the browser.
     """
     import secrets as _secrets
-    import hashlib, base64
 
     flow = _build_flow()
-    state = _secrets.token_urlsafe(32)
-    session["oauth_state"] = state
 
-    # Generate PKCE code_verifier and store it so callback can use it
-    code_verifier = _secrets.token_urlsafe(96)  # 128 URL-safe chars
-    session["oauth_code_verifier"] = code_verifier
-
-    # Compute code_challenge (S256)
-    digest = hashlib.sha256(code_verifier.encode()).digest()
-    code_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+    state_data = {
+        "user_id": str(user_id) if user_id else None,
+        "nonce": _secrets.token_hex(16),
+    }
+    state_token = _get_state_serializer().dumps(state_data)
+    session["oauth_state"] = state_token
 
     auth_url, _ = flow.authorization_url(
         access_type="offline",
         prompt="consent",
-        state=state,
+        state=state_token,
         include_granted_scopes="true",
-        code_challenge=code_challenge,
-        code_challenge_method="S256",
     )
-    logger.info("google_auth_url_generated")
+    logger.info("google_auth_url_generated", user_id=user_id)
     return auth_url
 
 
@@ -95,26 +94,25 @@ def handle_callback(
 ) -> User:
     """
     Handle the OAuth callback after Google redirects the user back.
-
-    Steps:
-      1. Validate the CSRF state
-      2. Exchange the authorization code for tokens
-      3. Fetch the user's profile from Google
-      4. Save or update the DriveAccount entry for this user & Google sub
-      5. Create (or reuse) the FlowDrive folder in Drive
-      6. Return the User for the caller to set in session
     """
-    # 1. CSRF state validation
-    stored_state = session.pop("oauth_state", None)
-    if not stored_state or stored_state != state:
-        raise ValueError("Invalid OAuth state. Possible CSRF attack.")
+    # 1. CSRF state validation — decrypt signed state token or fallback to session
+    user_id_from_state = None
+    try:
+        serializer = _get_state_serializer()
+        payload = serializer.loads(state)
+        if isinstance(payload, dict):
+            user_id_from_state = payload.get("user_id")
+    except Exception:
+        stored_state = session.pop("oauth_state", None)
+        if not stored_state or stored_state != state:
+            raise ValueError("Invalid OAuth state. Possible CSRF attack.")
 
-    # Retrieve stored PKCE verifier (must match what was sent in the auth URL)
-    code_verifier = session.pop("oauth_code_verifier", None)
+    if not attach_to_user_id:
+        attach_to_user_id = user_id_from_state or session.pop("connecting_drive_for", None)
 
     # 2. Exchange code for tokens
     flow = _build_flow()
-    flow.fetch_token(code=code, code_verifier=code_verifier)
+    flow.fetch_token(code=code)
     credentials = flow.credentials
 
     if not credentials.refresh_token:
@@ -288,5 +286,5 @@ def login(
     return user
 
 
-def get_drive_connect_url(session: dict) -> str:
-    return get_google_auth_url(session)
+def get_drive_connect_url(session: dict, user_id: str | None = None) -> str:
+    return get_google_auth_url(session, user_id=user_id)

@@ -95,7 +95,7 @@ def google_connect_url(
             detail="Google OAuth is not configured on this server.",
         )
     request.session["connecting_drive_for"] = str(current_user.id)
-    auth_url = auth_service.get_drive_connect_url(request.session)
+    auth_url = auth_service.get_drive_connect_url(request.session, user_id=str(current_user.id))
     logger.info("google_connect_url_generated", user_id=str(current_user.id))
     return {"url": auth_url}
 
@@ -127,7 +127,7 @@ def google_connect(
 
     # Mark this as a drive-connect flow
     request.session["connecting_drive_for"] = str(user.id)
-    auth_url = auth_service.get_drive_connect_url(request.session)
+    auth_url = auth_service.get_drive_connect_url(request.session, user_id=str(user.id))
     logger.info("redirecting_to_google_oauth", user_id=str(user.id))
     return RedirectResponse(url=auth_url)
 
