@@ -19,9 +19,9 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_name: str = "FlowDrive API"
     frontend_url: str = "http://localhost:5173"
-    database_url: str
-    session_secret: str
-    token_encryption_key: str
+    database_url: str = "sqlite:///./flowdrive.db"
+    session_secret: str = "flowdrive_session_secret_change_in_production_32b"
+    token_encryption_key: str = "flowdrive_token_encryption_key_32bytes_sec"
     cookie_secure: bool = False
     sentry_dsn: str = ""
 
