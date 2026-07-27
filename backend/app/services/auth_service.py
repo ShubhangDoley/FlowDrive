@@ -263,11 +263,13 @@ def login(
     else:
         user = user_repo.get_by_username(db, username_or_email)
 
-    if not user or not user.password_hash:
-        raise ValueError("Invalid credentials.")
+    if not user:
+        raise ValueError("User account does not exist. Please sign up first.")
+    if not user.password_hash:
+        raise ValueError("This account was created via Google. Please log in with Google.")
 
     if not pwd_ctx.verify(password, user.password_hash):
-        raise ValueError("Invalid credentials.")
+        raise ValueError("Incorrect password. Please check your password.")
 
     logger.info("user_logged_in_local", user_id=str(user.id))
     return user

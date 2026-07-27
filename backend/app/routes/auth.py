@@ -38,6 +38,7 @@ def register(
             password=body.password,
         )
     except ValueError as exc:
+        logger.warning("registration_failed", username=body.username, error=str(exc))
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
 
     request.session["user_id"] = str(user.id)
@@ -57,10 +58,11 @@ def local_login(
             username_or_email=body.username,
             password=body.password,
         )
-    except ValueError:
+    except ValueError as exc:
+        logger.warning("local_login_failed", username=body.username, error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password.",
+            detail=str(exc),
         )
 
     request.session["user_id"] = str(user.id)
