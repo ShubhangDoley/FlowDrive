@@ -236,7 +236,8 @@ def register(
     if user_repo.get_by_username(db, username):
         raise ValueError(f"Username '{username}' is already taken.")
 
-    password_hash = pwd_ctx.hash(password)
+    safe_password = password[:72] if password else ""
+    password_hash = pwd_ctx.hash(safe_password)
     user = user_repo.create_local(
         db,
         username=username,
@@ -268,7 +269,8 @@ def login(
     if not user.password_hash:
         raise ValueError("This account was created via Google. Please log in with Google.")
 
-    if not pwd_ctx.verify(password, user.password_hash):
+    safe_password = password[:72] if password else ""
+    if not pwd_ctx.verify(safe_password, user.password_hash):
         raise ValueError("Incorrect password. Please check your password.")
 
     logger.info("user_logged_in_local", user_id=str(user.id))
