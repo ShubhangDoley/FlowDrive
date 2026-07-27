@@ -223,18 +223,21 @@ def get_me(db: Session, user: User) -> UserMe:
     )
 
 
+pwd_ctx = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__truncate_error=False,
+)
+
+
 def _hash_password(password: str) -> str:
     import hashlib
-    from passlib.context import CryptContext
-    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
     prehashed = hashlib.sha256((password or "").encode("utf-8")).hexdigest()
     return pwd_ctx.hash(prehashed)
 
 
 def _verify_password(password: str, hashed_password: str) -> bool:
     import hashlib
-    from passlib.context import CryptContext
-    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
     prehashed = hashlib.sha256((password or "").encode("utf-8")).hexdigest()
     return pwd_ctx.verify(prehashed, hashed_password)
 
