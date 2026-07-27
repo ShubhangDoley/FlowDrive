@@ -15,8 +15,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import ENUM as PgEnum, UUID
+from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, Timestamps, UUIDPrimaryKey
@@ -32,16 +31,16 @@ class FileIntent(str, enum.Enum):
     temporary = "temporary"
 
 
-# Named PostgreSQL ENUM types so Alembic can manage them as first-class objects
-_provider_enum = PgEnum(FileProvider, name="file_provider", create_type=False)
-_intent_enum = PgEnum(FileIntent, name="file_intent", create_type=False)
+# Dialect-agnostic ENUM types for database compatibility (SQLite & PostgreSQL)
+_provider_enum = Enum(FileProvider, name="file_provider", create_type=False)
+_intent_enum = Enum(FileIntent, name="file_intent", create_type=False)
 
 
 class File(UUIDPrimaryKey, Timestamps, Base):
     __tablename__ = "files"
 
     owner_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -57,7 +56,7 @@ class File(UUIDPrimaryKey, Timestamps, Base):
 
     # Linked drive account (for google_drive files)
     drive_account_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("drive_accounts.id", ondelete="SET NULL"),
         nullable=True,
         index=True,

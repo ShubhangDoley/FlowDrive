@@ -8,8 +8,7 @@ via Fernet (see app/core/security.py).
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import DateTime, ForeignKey, JSON, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, Timestamps, UUIDPrimaryKey
@@ -20,7 +19,7 @@ class OAuthToken(UUIDPrimaryKey, Timestamps, Base):
     __table_args__ = (UniqueConstraint("user_id", name="uq_oauth_tokens_user_id"),)
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
@@ -30,8 +29,8 @@ class OAuthToken(UUIDPrimaryKey, Timestamps, Base):
     access_token_expiry: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # Provider metadata (scopes granted, token type, etc.) — stored as JSONB
-    provider_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # Provider metadata (scopes granted, token type, etc.) — stored as JSON
+    provider_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="oauth_token")  # noqa: F821

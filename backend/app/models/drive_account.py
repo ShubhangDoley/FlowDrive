@@ -6,8 +6,7 @@ Each user can have multiple connected Google Drive accounts.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, Timestamps, UUIDPrimaryKey
@@ -20,7 +19,7 @@ class DriveAccount(UUIDPrimaryKey, Timestamps, Base):
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -34,7 +33,7 @@ class DriveAccount(UUIDPrimaryKey, Timestamps, Base):
     access_token_expiry: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    provider_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    provider_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     user: Mapped["User"] = relationship("User", back_populates="drive_accounts")  # noqa: F821
