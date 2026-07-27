@@ -6,6 +6,8 @@ Usage:
   - get_current_user               →  FastAPI Depends() on any protected route
 """
 
+import base64
+import hashlib
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -18,8 +20,11 @@ from app.core.database import get_db
 
 def _get_fernet() -> Fernet:
     """Build a Fernet instance from the TOKEN_ENCRYPTION_KEY in settings."""
-    key = get_settings().token_encryption_key
-    return Fernet(key.encode() if isinstance(key, str) else key)
+    raw_key = get_settings().token_encryption_key or "flowdrive-default-token-encryption-key-32b"
+    key_bytes = raw_key.encode("utf-8") if isinstance(raw_key, str) else raw_key
+    # Hash to 32 bytes via SHA-256 and encode to urlsafe base64 (guaranteed valid Fernet key)
+    fernet_key = base64.urlsafe_b64encode(hashlib.sha256(key_bytes).digest())
+    return Fernet(fernet_key)
 
 
 def encrypt_token(plain: str) -> str:
