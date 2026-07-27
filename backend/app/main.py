@@ -77,10 +77,16 @@ def create_app() -> FastAPI:
         same_site="lax",
     )
 
-    # 3. CORS — restrict to the configured frontend origin
+    # 3. CORS — restrict to configured frontend origin + Cloudflare Pages
+    allow_origins = [settings.frontend_url, "http://localhost:5173", "http://127.0.0.1:5173"]
+    if settings.frontend_url and not settings.frontend_url.startswith("http"):
+        allow_origins.append(f"https://{settings.frontend_url}")
+        allow_origins.append(f"http://{settings.frontend_url}")
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.frontend_url, "http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_origins=allow_origins,
+        allow_origin_regex=r"https://.*\.pages\.dev",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -114,6 +120,12 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     def start_scheduler():
+        # Ensure database tables exist on startup
+        from app.models import Base
+        from app.core.database import engine
+        Base.metadata.create_all(bind=engine)
+        logger.info("database_tables_created")
+
         scheduler.start()
         logger.info(
             "scheduler_started",

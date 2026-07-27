@@ -101,8 +101,9 @@ def google_connect(
 @router.get("/google/callback", summary="Handle Google OAuth callback")
 def google_callback(
     request: Request,
-    code: str,
-    state: str,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
     db: Session = Depends(get_db),
 ):
     """
@@ -110,6 +111,13 @@ def google_callback(
     Handles both fresh login and Drive-connect flows.
     """
     settings = get_settings()
+    if error or not code or not state:
+        logger.warning("oauth_callback_cancelled_or_missing", error=error)
+        return RedirectResponse(
+            url=f"{settings.frontend_url}/?error=oauth_failed",
+            status_code=status.HTTP_302_FOUND,
+        )
+
     connecting_for = request.session.pop("connecting_drive_for", None)
 
     try:
