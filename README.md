@@ -111,6 +111,11 @@ Follow this guide to deploy your own instance of FlowDrive with your own Google 
 | `GOOGLE_DRIVE_FOLDER_NAME` | Folder created in user's Drive | `FlowDrive` |
 
 6. Click **Create Web Service**. Render will automatically build the Docker container and start your server!
+7. **⚡ Pro Tip — Keep Free Render Instance Awake**:
+   Render's free tier spins down web services after 15 minutes of inactivity. To prevent cold starts and keep your backend instantly responsive 24/7:
+   - Create a free account on [cron-job.org](https://cron-job.org/) or [UptimeRobot](https://uptimerobot.com/).
+   - Set up an automated HTTP `GET` request every **10-14 minutes** targeting your `/health` endpoint:
+     `https://<your-backend-render-domain>.onrender.com/health`
 
 ---
 
