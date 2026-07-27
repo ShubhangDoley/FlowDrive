@@ -53,6 +53,14 @@ class Settings(BaseSettings):
         return bool(self.google_client_id and self.google_client_secret)
 
     @property
+    def effective_google_redirect_uri(self) -> str:
+        if self.google_oauth_redirect_uri and "localhost" not in self.google_oauth_redirect_uri:
+            return self.google_oauth_redirect_uri
+        if self.is_production:
+            return "https://flowdrive-backend-2.onrender.com/api/v1/auth/google/callback"
+        return self.google_oauth_redirect_uri
+
+    @property
     def r2_configured(self) -> bool:
         return bool(
             self.r2_access_key_id

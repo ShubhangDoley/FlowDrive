@@ -36,6 +36,7 @@ GOOGLE_SCOPES = [
 def _build_flow() -> Flow:
     """Build a google-auth Flow from our settings."""
     settings = get_settings()
+    redirect_uri = settings.effective_google_redirect_uri
     return Flow.from_client_config(
         client_config={
             "web": {
@@ -43,11 +44,11 @@ def _build_flow() -> Flow:
                 "client_secret": settings.google_client_secret,
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [settings.google_oauth_redirect_uri],
+                "redirect_uris": [redirect_uri],
             }
         },
         scopes=GOOGLE_SCOPES,
-        redirect_uri=settings.google_oauth_redirect_uri,
+        redirect_uri=redirect_uri,
     )
 
 

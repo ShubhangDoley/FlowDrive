@@ -82,21 +82,32 @@ def google_login(request: Request):
 @router.get("/google/connect", summary="Connect Google Drive to existing account")
 def google_connect(
     request: Request,
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     For already-logged-in users: start the Google OAuth flow to link Drive.
     Stores the user_id in the session so the callback knows who to attach to.
     """
     settings = get_settings()
+    user_id: str | None = request.session.get("user_id")
+    if not user_id:
+        logger.warning("google_connect_unauthenticated")
+        return RedirectResponse(url=f"{settings.frontend_url}/?error=not_authenticated")
+
+    from app.repositories.user_repo import get_by_id
+    user = get_by_id(db, user_id)
+    if not user:
+        request.session.clear()
+        return RedirectResponse(url=f"{settings.frontend_url}/?error=not_authenticated")
+
     if not settings.google_configured:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Google OAuth is not configured on this server.",
-        )
-    # Mark this as a drive-connect flow (not a fresh login)
-    request.session["connecting_drive_for"] = str(current_user.id)
+        logger.warning("google_connect_not_configured")
+        return RedirectResponse(url=f"{settings.frontend_url}/?error=google_not_configured")
+
+    # Mark this as a drive-connect flow
+    request.session["connecting_drive_for"] = str(user.id)
     auth_url = auth_service.get_drive_connect_url(request.session)
+    logger.info("redirecting_to_google_oauth", user_id=str(user.id))
     return RedirectResponse(url=auth_url)
 
 
