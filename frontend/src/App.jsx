@@ -13,14 +13,17 @@ const GithubIcon = ({ size = 16, color = '#38bdf8' }) => (
 );
 
 // ─── API helper ───────────────────────────────────────────────────────────────
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://flowdrive-backend-2.onrender.com').replace(/\/$/, '');
+const getUrl = (path) => path.startsWith('http') ? path : `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+
 const API = {
-  get:      (path)           => fetch(path, { credentials: 'include' }),
-  post:     (path, body)     => fetch(path, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-  postForm: (path, formData) => fetch(path, { method: 'POST', credentials: 'include', body: formData }),
+  get:      (path)           => fetch(getUrl(path), { credentials: 'include' }),
+  post:     (path, body)     => fetch(getUrl(path), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  postForm: (path, formData) => fetch(getUrl(path), { method: 'POST', credentials: 'include', body: formData }),
   postFormWithProgress: (path, formData, onProgress, onRegisterAbort) => {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', path);
+      xhr.open('POST', getUrl(path));
       xhr.withCredentials = true;
 
       if (onRegisterAbort) {
@@ -51,8 +54,8 @@ const API = {
       xhr.send(formData);
     });
   },
-  patch:    (path, body)     => fetch(path, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-  delete:   (path)           => fetch(path, { method: 'DELETE', credentials: 'include' }),
+  patch:    (path, body)     => fetch(getUrl(path), { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  delete:   (path)           => fetch(getUrl(path), { method: 'DELETE', credentials: 'include' }),
 };
 
 // ─── Antigravity Glassmorphic Theme Tokens & Inline Styles ───────────────────
@@ -510,7 +513,7 @@ export default function App() {
 
   function handleDownload(file) {
     if (!file || !file.id) return;
-    window.open(`/api/v1/files/${file.id}/download`, '_blank');
+    window.open(getUrl(`/api/v1/files/${file.id}/download`), '_blank');
   }
 
   async function handleSetDefaultDrive(accountId) {
@@ -764,7 +767,7 @@ export default function App() {
           <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 28px' }}>We only request access to files FlowDrive creates.</p>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <button onClick={() => { window.location.href = '/api/v1/auth/google/connect'; }} style={S.btnPrimary}>
+            <button onClick={() => { window.location.href = getUrl('/api/v1/auth/google/connect'); }} style={S.btnPrimary}>
               <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
                 <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                 <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -1089,7 +1092,7 @@ export default function App() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', margin: 0 }}>Connected Drives</h2>
               <button
-                onClick={() => { window.location.href = '/api/v1/auth/google/connect'; }}
+                onClick={() => { window.location.href = getUrl('/api/v1/auth/google/connect'); }}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(99, 102, 241, 0.25)',  color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.35)', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
               >
                 <Plus size={14} /> Add Drive
@@ -1593,7 +1596,7 @@ export default function App() {
                           </p>
                           {(item.errorMsg.includes('invalid_grant') || item.errorMsg.includes('expired') || item.errorMsg.includes('revoked') || item.errorMsg.includes('Google Drive client')) && (
                             <button
-                              onClick={() => { window.location.href = '/api/v1/auth/google/connect'; }}
+                              onClick={() => { window.location.href = getUrl('/api/v1/auth/google/connect'); }}
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
