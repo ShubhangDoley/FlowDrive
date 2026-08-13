@@ -1,16 +1,32 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Cloud, LogOut, Upload, File as FileIcon,
-  Download, Trash2, Clock, RefreshCw, Search, X, Plus, HardDrive, Check, AlertCircle, Zap, Shield, Sparkles, CheckCircle2, Orbit, ChevronDown
+  Download, Trash2, Clock, RefreshCw, Search, X, Plus, HardDrive, Check, AlertCircle,
+  Zap, Orbit, Star
 } from 'lucide-react';
-import Prism from './Prism';
+import { Toaster, toast } from 'sonner';
 
-const GithubIcon = ({ size = 16, color = '#38bdf8' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
-    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
-    <path d="M9 18c-4.51 2-5-2-7-2" />
+const GithubIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" style={{ display: 'block' }}>
+    <path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
   </svg>
 );
+
+
+import { Button }                                                    from '@/components/ui/button';
+import { Input }                                                     from '@/components/ui/input';
+import { Label }                                                     from '@/components/ui/label';
+import { Tabs, TabsList, TabsTrigger, TabsContent }                  from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle,
+         DialogDescription, DialogFooter }                           from '@/components/ui/dialog';
+import { Alert, AlertTitle, AlertDescription }                       from '@/components/ui/alert';
+import { Badge }                                                      from '@/components/ui/badge';
+import { Progress }                                                   from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Avatar, AvatarFallback }                                    from '@/components/ui/avatar';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 // ─── API helper ───────────────────────────────────────────────────────────────
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://flowdrive-backend-2.onrender.com').replace(/\/$/, '');
@@ -25,11 +41,7 @@ const API = {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', getUrl(path));
       xhr.withCredentials = true;
-
-      if (onRegisterAbort) {
-        onRegisterAbort(() => xhr.abort());
-      }
-
+      if (onRegisterAbort) onRegisterAbort(() => xhr.abort());
       if (xhr.upload && onProgress) {
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
@@ -38,17 +50,11 @@ const API = {
           }
         };
       }
-
       xhr.onload = () => {
         let json = {};
         try { json = JSON.parse(xhr.responseText || '{}'); } catch (e) {}
-        resolve({
-          ok: xhr.status >= 200 && xhr.status < 300,
-          status: xhr.status,
-          json: async () => json,
-        });
+        resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, json: async () => json });
       };
-
       xhr.onerror = () => reject(new TypeError('Network request failed'));
       xhr.onabort = () => reject(new Error('Upload cancelled by user'));
       xhr.send(formData);
@@ -56,48 +62,6 @@ const API = {
   },
   patch:    (path, body)     => fetch(getUrl(path), { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
   delete:   (path)           => fetch(getUrl(path), { method: 'DELETE', credentials: 'include' }),
-};
-
-// ─── Antigravity Glassmorphic Theme Tokens & Inline Styles ───────────────────
-const S = {
-  input: {
-    display: 'block', width: '100%', height: '42px', padding: '0 14px',
-    border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px',
-    fontSize: '14px', color: '#f8fafc', background: 'rgba(15, 25, 48, 0.45)',
-    backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
-    transition: 'all 0.2s ease',
-  },
-  btnPrimary: {
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-    padding: '10px 20px', background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)', color: '#FFFFFF',
-    border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '8px', fontSize: '15px', fontWeight: 600,
-    cursor: 'pointer', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
-    boxShadow: '0 0 25px rgba(99, 102, 241, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3)', transition: 'all 0.2s ease',
-  },
-  btnDark: {
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-    padding: '10px 20px', background: 'rgba(30, 41, 59, 0.7)', color: '#FFFFFF',
-    backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255, 255, 255, 0.14)', borderRadius: '8px', fontSize: '15px', fontWeight: 600,
-    cursor: 'pointer', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
-    transition: 'all 0.2s ease',
-  },
-  btnOutline: {
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-    padding: '10px 20px', background: 'rgba(255, 255, 255, 0.05)', color: '#f8fafc',
-    backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '8px', fontSize: '14px', fontWeight: 600,
-    cursor: 'pointer', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
-    transition: 'all 0.2s ease',
-  },
-  btnIcon: {
-    background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.12)', cursor: 'pointer',
-    padding: '7px', borderRadius: '8px', color: '#a5b4fc',
-    backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    transition: 'all 0.2s ease', flexShrink: 0,
-  },
 };
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────
@@ -115,8 +79,8 @@ function fmtDate(isoString) {
   const date = new Date(isoString);
   const now  = new Date();
   const diff = now - date;
-  if (diff < 86400000)   return 'Today';
-  if (diff < 172800000)  return 'Yesterday';
+  if (diff < 86400000)  return 'Today';
+  if (diff < 172800000) return 'Yesterday';
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
@@ -139,13 +103,25 @@ function userInitials(username) {
   return username.substring(0, 2).toUpperCase();
 }
 
+// ─── Status badge map ──────────────────────────────────────────────────────────
+function QueueStatusBadge({ status }) {
+  const map = {
+    pending:   { label: 'Queued',     className: 'bg-yellow-300 border-black text-black' },
+    uploading: { label: 'Uploading',  className: 'bg-blue-400 border-black text-black'  },
+    completed: { label: 'Done',       className: 'bg-green-400 border-black text-black' },
+    error:     { label: 'Error',      className: 'bg-red-400 border-black text-black'   },
+    cancelled: { label: 'Cancelled',  className: 'bg-gray-300 border-black text-black'  },
+  };
+  const { label, className } = map[status] || { label: status, className: '' };
+  return <Badge className={`text-xs font-bold ${className}`}>{label}</Badge>;
+}
+
 // ─── App root ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [authState, setAuthState] = useState('loading');
   const [user,      setUser]      = useState(null);
 
   // Auth form state
-  const [authTab,    setAuthTab]    = useState('login');
   const [siUser,     setSiUser]     = useState('');
   const [siPass,     setSiPass]     = useState('');
   const [suUsername, setSuUsername] = useState('');
@@ -154,14 +130,11 @@ export default function App() {
   const [loading,    setLoading]    = useState(false);
 
   // Dashboard state
-  const [files,       setFiles]       = useState([]);
-  const [activeTab,   setActiveTab]   = useState('permanent'); // 'permanent' | 'temporary'
-  const [searchQuery, setSearchQuery] = useState('');
+  const [files,        setFiles]        = useState([]);
+  const [activeTab,    setActiveTab]    = useState('permanent');
+  const [searchQuery,  setSearchQuery]  = useState('');
   const [showAllFiles, setShowAllFiles] = useState(false);
-
-  useEffect(() => {
-    setShowAllFiles(false);
-  }, [activeTab, searchQuery]);
+  useEffect(() => { setShowAllFiles(false); }, [activeTab, searchQuery]);
 
   // Multi-Drive state
   const [driveAccounts,          setDriveAccounts]          = useState([]);
@@ -170,67 +143,35 @@ export default function App() {
   const [driveError,             setDriveError]             = useState(null);
   const [showAllDrives,          setShowAllDrives]          = useState(false);
 
-  // Upload Destination Options State
+  // Upload state
   const [uploadIntent,   setUploadIntent]   = useState('permanent');
   const [expiresHours,   setExpiresHours]   = useState('24');
   const [isDragging,     setIsDragging]     = useState(false);
-  const [isExpiryDropdownOpen, setIsExpiryDropdownOpen] = useState(false);
 
-  // Multi-File Upload Queue & Concurrency State
-  const [uploadQueue,        setUploadQueue]        = useState([]);
+  // Upload queue & concurrency
+  const [uploadQueue,       setUploadQueue]       = useState([]);
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
-  const [maxConcurrency,    setMaxConcurrency]    = useState(3); // 1, 3, or 5 parallel uploads
+  const [maxConcurrency,    setMaxConcurrency]    = useState(3);
 
-  // Custom Modal & Toast States
-  const [confirmModal, setConfirmModal] = useState({
-    isOpen: false,
-    title: '',
-    message: '',
-    confirmText: 'Delete',
-    danger: true,
-    onConfirm: null,
-  });
+  // Confirm modal
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', confirmText: 'Delete', danger: true, onConfirm: null });
 
-  const [toast, setToast] = useState({
-    isOpen: false,
-    message: '',
-    type: 'success', // 'success' | 'error' | 'info'
-  });
+  const fileInputRef    = useRef(null);
+  const activeAbortsRef = useRef({});
+  const uploadQueueRef  = useRef([]);
 
-  const toastTimerRef = useRef(null);
-
-  const showToast = useCallback((message, type = 'success') => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ isOpen: true, message, type });
-    toastTimerRef.current = setTimeout(() => {
-      setToast(prev => ({ ...prev, isOpen: false }));
-    }, 4000);
-  }, []);
-
-  function promptConfirm({ title, message, confirmText = 'Delete', danger = true, onConfirm }) {
-    setConfirmModal({
-      isOpen: true,
-      title,
-      message,
-      confirmText,
-      danger,
-      onConfirm: async () => {
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        if (onConfirm) await onConfirm();
-      }
-    });
-  }
-
-  const fileInputRef = useRef(null);
-  const activeAbortsRef = useRef({}); // Stores abort functions per queue item ID
-  const uploadQueueRef = useRef([]);  // Synchronous ref to prevent React state updater race conditions
-
-  // Helper to keep state and ref in sync
   const updateQueue = useCallback((updater) => {
     const next = typeof updater === 'function' ? updater(uploadQueueRef.current) : updater;
     uploadQueueRef.current = next;
     setUploadQueue(next);
   }, []);
+
+  function promptConfirm({ title, message, confirmText = 'Delete', danger = true, onConfirm }) {
+    setConfirmModal({ isOpen: true, title, message, confirmText, danger, onConfirm: async () => {
+      setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      if (onConfirm) await onConfirm();
+    }});
+  }
 
   // ─── Auth check on mount ──────────────────────────────────────────────────
   useEffect(() => {
@@ -252,29 +193,20 @@ export default function App() {
           if (window.location.pathname !== '/') window.history.replaceState({}, '', '/');
         }
       })
-      .catch(() => {
-        setAuthState('unauthenticated');
-        if (window.location.pathname !== '/') window.history.replaceState({}, '', '/');
-      });
+      .catch(() => { setAuthState('unauthenticated'); });
   }, []);
 
   const fetchFiles = useCallback(async () => {
     if (authState !== 'authenticated') return;
     try {
       const res = await API.get('/api/v1/files');
-      if (res.ok) {
-        const data = await res.json();
-        setFiles(data.files ?? []);
-      }
-    } catch (e) {
-      console.error('Failed to fetch files', e);
-    }
+      if (res.ok) { const data = await res.json(); setFiles(data.files ?? []); }
+    } catch (e) { console.error('Failed to fetch files', e); }
   }, [authState]);
 
   const fetchDriveAccounts = useCallback(async () => {
     if (authState !== 'authenticated') return;
-    setDriveAccountsLoading(true);
-    setDriveError(null);
+    setDriveAccountsLoading(true); setDriveError(null);
     try {
       const res = await API.get('/api/v1/drive/accounts');
       if (res.ok) {
@@ -284,18 +216,12 @@ export default function App() {
         const def = accounts.find(a => a.is_default) ?? accounts[0];
         if (def) setSelectedDriveAccountId(def.id);
       }
-    } catch (e) {
-      console.error('Failed to fetch drive accounts', e);
-    } finally {
-      setDriveAccountsLoading(false);
-    }
+    } catch (e) { console.error('Failed to fetch drive accounts', e); }
+    finally { setDriveAccountsLoading(false); }
   }, [authState]);
 
   useEffect(() => {
-    if (authState === 'authenticated') {
-      fetchFiles();
-      fetchDriveAccounts();
-    }
+    if (authState === 'authenticated') { fetchFiles(); fetchDriveAccounts(); }
   }, [authState, fetchFiles, fetchDriveAccounts]);
 
   const onAuth = (userData) => {
@@ -308,77 +234,43 @@ export default function App() {
   const processQueue = useCallback(async () => {
     if (isProcessingQueue) return;
     setIsProcessingQueue(true);
-
     const runWorker = async () => {
       while (true) {
         const pendingIdx = uploadQueueRef.current.findIndex(item => item.status === 'pending');
         if (pendingIdx === -1) break;
-
         const targetItem = uploadQueueRef.current[pendingIdx];
-
         const updatedQueue = [...uploadQueueRef.current];
         updatedQueue[pendingIdx] = { ...targetItem, status: 'uploading', progressPct: 0 };
         updateQueue(updatedQueue);
-
         try {
           const form = new FormData();
           form.append('upload', targetItem.file);
           form.append('intent', targetItem.intent);
-          if (targetItem.intent === 'permanent' && targetItem.driveAccountId) {
-            form.append('drive_account_id', targetItem.driveAccountId);
-          }
-          if (targetItem.intent === 'temporary') {
-            form.append('expiry_hours', targetItem.expiresHours);
-          }
-
+          if (targetItem.intent === 'permanent' && targetItem.driveAccountId) form.append('drive_account_id', targetItem.driveAccountId);
+          if (targetItem.intent === 'temporary') form.append('expiry_hours', targetItem.expiresHours);
           const res = await API.postFormWithProgress(
-            '/api/v1/files',
-            form,
+            '/api/v1/files', form,
             (pct, loaded, total) => {
               const idx = uploadQueueRef.current.findIndex(i => i.id === targetItem.id);
-              if (idx !== -1) {
-                const next = [...uploadQueueRef.current];
-                next[idx] = { ...next[idx], progressPct: pct, loaded, total };
-                updateQueue(next);
-              }
+              if (idx !== -1) { const next = [...uploadQueueRef.current]; next[idx] = { ...next[idx], progressPct: pct, loaded, total }; updateQueue(next); }
             },
-            (abortFn) => {
-              activeAbortsRef.current[targetItem.id] = abortFn;
-            }
+            (abortFn) => { activeAbortsRef.current[targetItem.id] = abortFn; }
           );
-
           delete activeAbortsRef.current[targetItem.id];
-
-          if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            throw new Error(data.detail ?? `Upload failed (${res.status})`);
-          }
-
+          if (!res.ok) { const data = await res.json().catch(() => ({})); throw new Error(data.detail ?? `Upload failed (${res.status})`); }
           const idx = uploadQueueRef.current.findIndex(i => i.id === targetItem.id);
-          if (idx !== -1) {
-            const next = [...uploadQueueRef.current];
-            next[idx] = { ...next[idx], status: 'completed', progressPct: 100 };
-            updateQueue(next);
-          }
-          fetchFiles();
-          fetchDriveAccounts();
+          if (idx !== -1) { const next = [...uploadQueueRef.current]; next[idx] = { ...next[idx], status: 'completed', progressPct: 100 }; updateQueue(next); }
+          fetchFiles(); fetchDriveAccounts();
+          toast.success(`${targetItem.file.name} uploaded successfully`);
         } catch (err) {
           delete activeAbortsRef.current[targetItem.id];
           const isCancelled = err.message?.includes('cancelled');
           const idx = uploadQueueRef.current.findIndex(i => i.id === targetItem.id);
-          if (idx !== -1) {
-            const next = [...uploadQueueRef.current];
-            next[idx] = {
-              ...next[idx],
-              status: isCancelled ? 'cancelled' : 'error',
-              errorMsg: isCancelled ? null : err.message
-            };
-            updateQueue(next);
-          }
+          if (idx !== -1) { const next = [...uploadQueueRef.current]; next[idx] = { ...next[idx], status: isCancelled ? 'cancelled' : 'error', errorMsg: isCancelled ? null : err.message }; updateQueue(next); }
+          if (!isCancelled) toast.error(err.message ?? 'Upload failed');
         }
       }
     };
-
     const workers = Array.from({ length: maxConcurrency }, () => runWorker());
     await Promise.all(workers);
     setIsProcessingQueue(false);
@@ -386,99 +278,70 @@ export default function App() {
 
   useEffect(() => {
     const hasPending = uploadQueue.some(item => item.status === 'pending');
-    if (hasPending && !isProcessingQueue) {
-      processQueue();
-    }
+    if (hasPending && !isProcessingQueue) processQueue();
   }, [uploadQueue, isProcessingQueue, processQueue]);
 
   function addFilesToQueue(fileList) {
     if (!fileList || fileList.length === 0) return;
     const newItems = Array.from(fileList).map((file, idx) => ({
       id: `q-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
-      file: file,
-      intent: uploadIntent,
+      file, intent: uploadIntent,
       driveAccountId: uploadIntent === 'permanent' ? selectedDriveAccountId : null,
-      expiresHours: expiresHours,
-      status: 'pending',
-      progressPct: 0,
-      loaded: 0,
-      total: file.size,
-      errorMsg: null,
+      expiresHours, status: 'pending', progressPct: 0, loaded: 0, total: file.size, errorMsg: null,
     }));
     updateQueue(prev => [...prev, ...newItems]);
   }
 
   function cancelOrRemoveQueueItem(itemId) {
-    if (activeAbortsRef.current[itemId]) {
-      try {
-        activeAbortsRef.current[itemId]();
-      } catch (e) {}
-      delete activeAbortsRef.current[itemId];
-    }
+    if (activeAbortsRef.current[itemId]) { try { activeAbortsRef.current[itemId](); } catch (e) {} delete activeAbortsRef.current[itemId]; }
     updateQueue(prev => prev.filter(item => item.id !== itemId));
   }
-
-  function clearCompletedQueue() {
-    updateQueue(prev => prev.filter(item => item.status !== 'completed' && item.status !== 'cancelled'));
-  }
-
-  function retryFailedQueue() {
-    updateQueue(prev => prev.map(item => (item.status === 'error' || item.status === 'cancelled') ? { ...item, status: 'pending', errorMsg: null, progressPct: 0 } : item));
-  }
+  function clearCompletedQueue() { updateQueue(prev => prev.filter(item => item.status !== 'completed' && item.status !== 'cancelled')); }
+  function retryFailedQueue() { updateQueue(prev => prev.map(item => (item.status === 'error' || item.status === 'cancelled') ? { ...item, status: 'pending', errorMsg: null, progressPct: 0 } : item)); }
 
   // Aggregate storage calculations
-  const totalUsedBytes = driveAccounts.reduce((acc, a) => acc + (a.storage?.used_bytes || 0), 0);
+  const totalUsedBytes  = driveAccounts.reduce((acc, a) => acc + (a.storage?.used_bytes  || 0), 0);
   const totalLimitBytes = driveAccounts.reduce((acc, a) => acc + (a.storage?.limit_bytes || 0), 0);
-  const totalUsagePct = totalLimitBytes > 0 ? Math.min(Math.round((totalUsedBytes / totalLimitBytes) * 100), 100) : 0;
+  const totalUsagePct   = totalLimitBytes > 0 ? Math.min(Math.round((totalUsedBytes / totalLimitBytes) * 100), 100) : 0;
 
-  // Queue progress aggregates
-  const completedCount = uploadQueue.filter(i => i.status === 'completed').length;
-  const uploadingCount = uploadQueue.filter(i => i.status === 'uploading').length;
+  // Queue aggregates
+  const completedCount  = uploadQueue.filter(i => i.status === 'completed').length;
+  const uploadingCount  = uploadQueue.filter(i => i.status === 'uploading').length;
   const totalQueueCount = uploadQueue.length;
   const totalQueueBytes = uploadQueue.reduce((acc, i) => acc + i.total, 0);
-  const loadedQueueBytes = uploadQueue.reduce((acc, i) => acc + (i.status === 'completed' ? i.total : (i.loaded || 0)), 0);
+  const loadedQueueBytes= uploadQueue.reduce((acc, i) => acc + (i.status === 'completed' ? i.total : (i.loaded || 0)), 0);
   const overallQueuePct = totalQueueBytes > 0 ? Math.min(Math.round((loadedQueueBytes / totalQueueBytes) * 100), 100) : 0;
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
   async function handleSignIn(e) {
-    e.preventDefault();
-    setError(''); setLoading(true);
+    e.preventDefault(); setError(''); setLoading(true);
     try {
       const res  = await API.post('/api/v1/auth/login', { username: siUser, password: siPass });
       const data = await res.json();
       if (!res.ok) { setError(data.detail ?? 'Login failed.'); return; }
       onAuth(data);
     } catch { setError('Network error. Please try again.'); }
-    finally   { setLoading(false); }
+    finally { setLoading(false); }
   }
 
   async function handleSignUp(e) {
-    e.preventDefault();
-    setError(''); setLoading(true);
+    e.preventDefault(); setError(''); setLoading(true);
     try {
       const res  = await API.post('/api/v1/auth/register', { username: suUsername, password: suPass });
       const data = await res.json();
       if (!res.ok) { setError(data.detail ?? 'Registration failed.'); return; }
       onAuth(data);
     } catch { setError('Network error. Please try again.'); }
-    finally   { setLoading(false); }
+    finally { setLoading(false); }
   }
 
   function handleLogout() {
     promptConfirm({
-      title: 'Log Out',
-      message: 'Are you sure you want to log out of your FlowDrive space workspace?',
-      confirmText: 'Log Out',
-      danger: true,
+      title: 'Log Out', message: 'Are you sure you want to log out of FlowDrive?',
+      confirmText: 'Log Out', danger: true,
       onConfirm: async () => {
-        try {
-          await API.post('/api/v1/auth/logout', {});
-          setAuthState('unauthenticated');
-          setUser(null);
-          showToast('Logged out successfully', 'info');
-        } catch (e) {
-          showToast('Failed to log out. Please try again.', 'error');
-        }
+        try { await API.post('/api/v1/auth/logout', {}); setAuthState('unauthenticated'); setUser(null); toast.success('Logged out successfully'); }
+        catch (e) { toast.error('Failed to log out. Please try again.'); }
       }
     });
   }
@@ -486,27 +349,22 @@ export default function App() {
   function handleDelete(file) {
     if (!file || !file.id) return;
     const isDrive = file.provider === 'google_drive';
-    
     promptConfirm({
       title: 'Delete File',
-      message: `Are you sure you want to delete "${file.filename}" from ${isDrive ? 'Google Drive' : 'temporary storage'}? This action cannot be undone.`,
-      confirmText: 'Delete File',
-      danger: true,
+      message: `Delete "${file.filename}" from ${isDrive ? 'Google Drive' : 'temporary storage'}? This cannot be undone.`,
+      confirmText: 'Delete File', danger: true,
       onConfirm: async () => {
         try {
           const res = await API.delete(`/api/v1/files/${file.id}`);
           if (res.ok || res.status === 204) {
             setFiles(prev => prev.filter(f => f.id !== file.id));
-            showToast(`"${file.filename}" deleted successfully`, 'success');
-            fetchFiles();
-            fetchDriveAccounts();
+            toast.success(`"${file.filename}" deleted`);
+            fetchFiles(); fetchDriveAccounts();
           } else {
             const errData = await res.json().catch(() => ({}));
-            showToast(`Delete failed: ${errData.detail || 'Server error'}`, 'error');
+            toast.error(`Delete failed: ${errData.detail || 'Server error'}`);
           }
-        } catch (err) {
-          showToast('Delete failed due to network error.', 'error');
-        }
+        } catch { toast.error('Delete failed due to network error.'); }
       }
     });
   }
@@ -520,42 +378,21 @@ export default function App() {
     setDriveError(null);
     try {
       const res = await API.patch(`/api/v1/drive/accounts/${accountId}/default`, {});
-      if (res.ok) {
-        showToast('Default Google Drive updated', 'success');
-        fetchDriveAccounts();
-      } else {
-        const data = await res.json().catch(() => ({}));
-        setDriveError(data.detail ?? 'Failed to set default Drive account.');
-        showToast('Failed to update default Drive', 'error');
-      }
-    } catch (e) {
-      setDriveError('Failed to set default Drive account.');
-      showToast('Failed to update default Drive', 'error');
-    }
+      if (res.ok) { toast.success('Default Google Drive updated'); fetchDriveAccounts(); }
+      else { const data = await res.json().catch(() => ({})); toast.error(data.detail ?? 'Failed to set default Drive'); }
+    } catch { toast.error('Failed to update default Drive'); }
   }
 
   function handleDisconnectDrive(account) {
     promptConfirm({
-      title: 'Disconnect Google Drive',
-      message: `Are you sure you want to disconnect Google account (${account.account_email})?`,
-      confirmText: 'Disconnect Drive',
-      danger: true,
+      title: 'Disconnect Drive', message: `Disconnect Google account (${account.account_email})?`,
+      confirmText: 'Disconnect', danger: true,
       onConfirm: async () => {
-        setDriveError(null);
         try {
           const res = await API.delete(`/api/v1/drive/accounts/${account.id}`);
-          if (res.ok) {
-            showToast(`Disconnected ${account.account_email}`, 'success');
-            fetchDriveAccounts();
-          } else {
-            const data = await res.json().catch(() => ({}));
-            setDriveError(data.detail ?? 'Failed to disconnect Drive account.');
-            showToast(data.detail ?? 'Failed to disconnect Drive account.', 'error');
-          }
-        } catch (e) {
-          setDriveError('Failed to disconnect Drive account.');
-          showToast('Failed to disconnect Drive account.', 'error');
-        }
+          if (res.ok) { toast.success(`Disconnected ${account.account_email}`); fetchDriveAccounts(); }
+          else { const data = await res.json().catch(() => ({})); toast.error(data.detail ?? 'Failed to disconnect'); }
+        } catch { toast.error('Failed to disconnect Drive account.'); }
       }
     });
   }
@@ -563,98 +400,72 @@ export default function App() {
   async function handleGoogleConnect() {
     try {
       const res = await API.get('/api/v1/auth/google/connect-url');
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.url) {
-          window.location.href = data.url;
-          return;
-        }
-      }
+      if (res.ok) { const data = await res.json(); if (data?.url) { window.location.href = data.url; return; } }
       window.location.href = getUrl('/api/v1/auth/google/connect');
-    } catch (e) {
-      window.location.href = getUrl('/api/v1/auth/google/connect');
-    }
+    } catch { window.location.href = getUrl('/api/v1/auth/google/connect'); }
   }
+
+  // Filtered files
+  const filteredFiles  = files.filter(f => {
+    const typeMatch = activeTab === 'permanent' ? f.provider === 'google_drive' : f.provider !== 'google_drive';
+    const nameMatch = !searchQuery || f.filename?.toLowerCase().includes(searchQuery.toLowerCase());
+    return typeMatch && nameMatch;
+  });
+  const FILE_PAGE      = 8;
+  const displayedFiles = showAllFiles ? filteredFiles : filteredFiles.slice(0, FILE_PAGE);
+  const hasMoreFiles   = filteredFiles.length > FILE_PAGE;
+
+  const DRIVE_PAGE      = 4;
+  const displayedDrives = showAllDrives ? driveAccounts : driveAccounts.slice(0, DRIVE_PAGE);
+  const hasMoreDrives   = driveAccounts.length > DRIVE_PAGE;
+  const dropZoneClass   = `drop-zone${isDragging ? ' drag-over' : ''}`;
 
   // ─── Loading screen ───────────────────────────────────────────────────────
   if (authState === 'loading') {
     return (
-      <div className="space-canvas" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', minHeight: '100vh', position: 'relative' }}>
-        <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-          <Prism
-            animationType="3drotate"
-            timeScale={1.2}
-            height={2.3}
-            baseWidth={4.4}
-            scale={2.5}
-            hueShift={0}
-            colorFrequency={4}
-            noise={0.8}
-            glow={0.4}
-          />
+      <div className="neo-bg flex flex-col items-center justify-center min-h-screen gap-4">
+        <div className="w-16 h-16 rounded-base border-4 border-black bg-main flex items-center justify-center shadow-shadow">
+          <Orbit size={32} />
         </div>
-        <div style={{ background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)', borderRadius: '16px', width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 30px rgba(99, 102, 241, 0.5)', zIndex: 1 }}>
-          <Orbit color="white" size={32} />
+        <div className="flex items-center gap-3 text-base font-bold">
+          <RefreshCw size={18} className="animate-spin" />
+          <span>Loading FlowDrive…</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#f8fafc', fontSize: '15px', fontWeight: 600, zIndex: 1 }}>
-          <RefreshCw size={18} style={{ color: '#38bdf8' }} className="animate-spin-slow" />
-          <span>Opening Antigravity space workspace…</span>
-        </div>
+        <Toaster richColors position="bottom-right" />
       </div>
     );
   }
 
-  // ─── Auth page (Antigravity Space Canvas) ──────────────────────────────────
+  // ─── Auth page ──────────────────────────────────────────────────────────
   if (authState === 'unauthenticated') {
     return (
-      <div className="space-canvas" style={{ display: 'flex', minHeight: '100vh', position: 'relative', overflow: 'hidden', alignItems: 'center' }}>
-        <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-          <Prism
-            animationType="3drotate"
-            timeScale={1.2}
-            height={2.3}
-            baseWidth={4.4}
-            scale={2.5}
-            hueShift={0}
-            colorFrequency={4}
-            noise={0.8}
-            glow={0.4}
-          />
-        </div>
+      <div className="neo-bg flex min-h-screen">
+        <Toaster richColors position="bottom-right" />
 
-        {/* Left brand panel — desktop only */}
-        <div
-          className="hidden lg:flex"
-          style={{
-            flex: 1.2, flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '64px 48px', position: 'relative', zIndex: 1
-          }}
-        >
-          <div style={{ maxWidth: '560px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '24px' }}>
-              <div style={{ background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)', borderRadius: '18px', width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 30px rgba(99, 102, 241, 0.5)' }}>
-                <Orbit color="white" size={32} />
+        {/* Left brand panel — desktop */}
+        <div className="hidden lg:flex flex-col justify-center px-16 py-12 w-[52%] border-r-4 border-black bg-main">
+          <div className="max-w-lg">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-14 h-14 rounded-base border-4 border-black bg-background flex items-center justify-center shadow-shadow">
+                <Orbit size={28} />
               </div>
-              <h1 style={{ fontSize: '58px', fontWeight: 800, margin: 0, letterSpacing: '-1px' }} className="text-gradient">FlowDrive</h1>
+              <h1 className="font-heading text-6xl tracking-tight">FlowDrive</h1>
             </div>
-
-            <p style={{ fontSize: '20px', color: '#94a3b8', margin: '0 0 40px', lineHeight: 1.6, fontWeight: 400 }}>
-              Your storage, elevated into the cloud universe. Stream permanent files directly into Google Drive, or deploy temporary shares via Cloudflare R2.
+            <p className="text-lg font-base mb-8 leading-relaxed">
+              Your storage, elevated. Upload permanent files to Google Drive or share temporary files via Cloudflare R2.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="flex flex-col gap-4">
               {[
-                { title: 'Google Drive Multi-Account Routing', desc: 'Connect unlimited Google accounts & stream targeted storage' },
-                { title: 'Cloudflare R2 Temporary Shares', desc: 'Auto-expiring space links for 1h, 24h, or 7 days' },
-                { title: 'Multi-Threaded Turbo Parallel Pool', desc: 'Accelerate uploads up to 5x with live pause and instant cancels' },
+                { icon: <Cloud size={20} />, title: 'Multi-Account Google Drive', desc: 'Connect unlimited Google accounts and route uploads' },
+                { icon: <Clock size={20} />, title: 'Cloudflare R2 Temporary Shares', desc: 'Auto-expiring links for 1h, 24h, or 7 days' },
+                { icon: <Zap  size={20} />, title: 'Parallel Upload Pool', desc: 'Up to 5x faster with live progress and cancel support' },
               ].map((feat, i) => (
-                <div key={i} className="paper-card" style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', padding: '18px 24px' }}>
-                  <div style={{ background: 'rgba(99, 102, 241, 0.2)', borderRadius: '10px', padding: '8px', color: '#38bdf8', marginTop: '2px' }}>
-                    <CheckCircle2 size={18} />
-                  </div>
+                <div key={i} className="flex items-start gap-3 p-4 rounded-base border-2 border-black bg-background shadow-shadow">
+                  <div className="mt-0.5 shrink-0">{feat.icon}</div>
                   <div>
-                    <h4 style={{ fontSize: '15px', fontWeight: 600, color: '#f8fafc', margin: 0 }}>{feat.title}</h4>
-                    <p style={{ fontSize: '14px', color: '#94a3b8', margin: '3px 0 0' }}>{feat.desc}</p>
+                    <p className="font-heading text-sm">{feat.title}</p>
+                    <p className="font-base text-xs mt-0.5 opacity-70">{feat.desc}</p>
                   </div>
                 </div>
               ))}
@@ -662,93 +473,77 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right form panel — enlarged card & inputs */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '64px 32px', zIndex: 1 }}>
-          <div className="paper-card" style={{ width: '100%', maxWidth: '520px', padding: '52px 44px' }}>
-
+        {/* Right auth card */}
+        <div className="flex flex-1 items-center justify-center p-8">
+          <div className="w-full max-w-md">
             {/* Mobile logo */}
-            <div className="flex lg:hidden" style={{ alignItems: 'center', gap: '14px', marginBottom: '32px' }}>
-              <div style={{ background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)', borderRadius: '14px', width: '46px', height: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Orbit color="white" size={24} />
+            <div className="flex items-center gap-3 mb-8 lg:hidden">
+              <div className="w-10 h-10 rounded-base border-2 border-black bg-main flex items-center justify-center shadow-shadow">
+                <Orbit size={20} />
               </div>
-              <span style={{ fontWeight: 800, fontSize: '28px' }} className="text-gradient">FlowDrive</span>
+              <h1 className="font-heading text-3xl">FlowDrive</h1>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <h2 style={{ fontSize: '28px', fontWeight: 800, color: '#f8fafc', margin: 0, letterSpacing: '-0.5px' }}>
-                {authTab === 'login' ? 'Welcome to Space Workspace' : 'Create your Space Account'}
-              </h2>
-            </div>
-            <p style={{ fontSize: '15px', color: '#94a3b8', margin: '0 0 28px', lineHeight: 1.5 }}>
-              {authTab === 'login' ? 'Sign in to access your cloud storage universe.' : 'Get started with FlowDrive today.'}
-            </p>
+            <Card className="border-4 border-black shadow-[8px_8px_0_0_#000] rounded-base bg-background">
+              <CardHeader className="pb-4">
+                <CardTitle className="font-heading text-2xl">Welcome back</CardTitle>
+                <CardDescription className="font-base">Sign in or create your FlowDrive account</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {error && (
+                  <Alert className="mb-4 border-2 border-black bg-red-300 text-black rounded-base shadow-shadow">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle className="font-heading">Error</AlertTitle>
+                    <AlertDescription className="font-base">{error}</AlertDescription>
+                  </Alert>
+                )}
 
-            {/* Error banner */}
-            {error && (
-              <div className="error-card" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <AlertCircle size={18} style={{ flexShrink: 0 }} />
-                <span>{error === 'oauth_failed' ? 'Google sign-in failed. Please try again.' : error}</span>
-              </div>
-            )}
+                <Tabs defaultValue="login" onValueChange={() => setError('')}>
+                  <TabsList className="w-full mb-6">
+                    <TabsTrigger value="login"    className="flex-1 font-base">Sign In</TabsTrigger>
+                    <TabsTrigger value="register" className="flex-1 font-base">Sign Up</TabsTrigger>
+                  </TabsList>
 
-            {/* Tab switcher */}
-            <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.04)', borderRadius: '10px', padding: '4px', marginBottom: '28px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-              {[{ id: 'login', label: 'Log In' }, { id: 'signup', label: 'Sign Up' }].map(({ id, label }) => (
-                <button
-                  key={id}
-                  onClick={() => { setAuthTab(id); setError(''); }}
-                  style={{
-                    flex: 1, height: '42px', borderRadius: '8px', fontSize: '15px', fontWeight: 600,
-                    border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                    background: authTab === id ? 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)' : 'transparent',
-                    color:      authTab === id ? '#FFFFFF' : '#94a3b8',
-                    boxShadow:  authTab === id ? '0 0 20px rgba(99, 102, 241, 0.4)' : 'none',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+                  <TabsContent value="login">
+                    <form onSubmit={handleSignIn} className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="si-user" className="font-heading">Username</Label>
+                        <Input id="si-user" placeholder="your_username" autoComplete="username"
+                          value={siUser} onChange={e => setSiUser(e.target.value)} required />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="si-pass" className="font-heading">Password</Label>
+                        <Input id="si-pass" type="password" placeholder="••••••••" autoComplete="current-password"
+                          value={siPass} onChange={e => setSiPass(e.target.value)} required />
+                      </div>
+                      <Button type="submit" className="w-full mt-2" disabled={loading}>
+                        {loading ? <RefreshCw size={16} className="animate-spin" /> : null}
+                        {loading ? 'Signing in…' : 'Sign In'}
+                      </Button>
+                    </form>
+                  </TabsContent>
 
-            {/* Login form */}
-            {authTab === 'login' ? (
-              <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div>
-                  <label htmlFor="si-user" style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc', display: 'block', marginBottom: '8px' }}>Username</label>
-                  <input id="si-user" type="text" placeholder="your_username" autoComplete="username" value={siUser} onChange={e => setSiUser(e.target.value)} required style={{ ...S.input, height: '48px', fontSize: '15px', padding: '0 16px' }} />
-                </div>
-                <div>
-                  <label htmlFor="si-pass" style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc', display: 'block', marginBottom: '8px' }}>Password</label>
-                  <input id="si-pass" type="password" placeholder="••••••••" autoComplete="current-password" value={siPass} onChange={e => setSiPass(e.target.value)} required style={{ ...S.input, height: '48px', fontSize: '15px', padding: '0 16px' }} />
-                </div>
-                <button type="submit" disabled={loading} style={{ ...S.btnPrimary, height: '48px', fontSize: '15px', marginTop: '6px', opacity: loading ? 0.72 : 1 }}>
-                  {loading ? <RefreshCw size={18} className="animate-spin" /> : null}
-                  Sign In to Workspace
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleSignUp} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div>
-                  <label htmlFor="su-username" style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc', display: 'block', marginBottom: '8px' }}>Username</label>
-                  <input id="su-username" type="text" placeholder="cool_username" autoComplete="username" value={suUsername} onChange={e => setSuUsername(e.target.value)} required pattern="[a-zA-Z0-9_]+" style={{ ...S.input, height: '48px', fontSize: '15px', padding: '0 16px' }} />
-                </div>
-                <div>
-                  <label htmlFor="su-pass" style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc', display: 'block', marginBottom: '8px' }}>
-                    Password <span style={{ fontWeight: 400, color: '#94a3b8' }}>(min 8 chars)</span>
-                  </label>
-                  <input id="su-pass" type="password" placeholder="••••••••" autoComplete="new-password" value={suPass} onChange={e => setSuPass(e.target.value)} required minLength={8} style={{ ...S.input, height: '48px', fontSize: '15px', padding: '0 16px' }} />
-                </div>
-                <button type="submit" disabled={loading} style={{ ...S.btnPrimary, height: '48px', fontSize: '15px', marginTop: '6px', opacity: loading ? 0.72 : 1 }}>
-                  {loading ? <RefreshCw size={18} className="animate-spin" /> : null}
-                  Create Space Account
-                </button>
-              </form>
-            )}
-
-            <p style={{ fontSize: '13px', color: '#64748b', textAlign: 'center', marginTop: '24px' }}>
-              By continuing you agree to FlowDrive's terms of service.
-            </p>
+                  <TabsContent value="register">
+                    <form onSubmit={handleSignUp} className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="su-user" className="font-heading">Username</Label>
+                        <Input id="su-user" placeholder="choose_a_username" autoComplete="username"
+                          value={suUsername} onChange={e => setSuUsername(e.target.value)} required />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="su-pass" className="font-heading">Password</Label>
+                        <Input id="su-pass" type="password" placeholder="••••••••" autoComplete="new-password"
+                          value={suPass} onChange={e => setSuPass(e.target.value)} required />
+                      </div>
+                      <Button type="submit" className="w-full mt-2" disabled={loading}>
+                        {loading ? <RefreshCw size={16} className="animate-spin" /> : null}
+                        {loading ? 'Creating account…' : 'Create Account'}
+                      </Button>
+                    </form>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
@@ -758,1104 +553,572 @@ export default function App() {
   // ─── Connect Google Drive page ────────────────────────────────────────────
   if (authState === 'needs_drive') {
     return (
-      <div className="space-canvas" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', position: 'relative' }}>
-        <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-          <Prism
-            animationType="3drotate"
-            timeScale={1.2}
-            height={2.3}
-            baseWidth={4.4}
-            scale={2.5}
-            hueShift={0}
-            colorFrequency={4}
-            noise={0.8}
-            glow={0.4}
-          />
-        </div>
-        <div className="paper-card" style={{ padding: '52px 44px', width: '100%', maxWidth: '500px', textAlign: 'center', position: 'relative', zIndex: 1 }}>
-          <div style={{ background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)', borderRadius: '16px', width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', boxShadow: '0 0 25px rgba(99, 102, 241, 0.5)' }}>
-            <Cloud color="white" size={30} />
+      <div className="neo-bg flex flex-col items-center justify-center min-h-screen p-8">
+        <Toaster richColors position="bottom-right" />
+        <div className="w-full max-w-sm">
+          <div className="flex items-center gap-3 mb-8 justify-center">
+            <div className="w-12 h-12 rounded-base border-4 border-black bg-main flex items-center justify-center shadow-shadow">
+              <Orbit size={24} />
+            </div>
+            <h1 className="font-heading text-3xl">FlowDrive</h1>
           </div>
-          <h1 style={{ fontSize: '26px', fontWeight: 700, margin: '0 0 10px' }}  className="text-gradient">Link Google Drive Space</h1>
-          <p style={{ fontSize: '14px', color: '#94a3b8', margin: '0 0 8px', lineHeight: 1.6 }}>
-            Welcome, <strong style={{ color: '#f8fafc' }}>{user?.username}</strong>. Connect your Google account to store permanent files in your Drive.
-          </p>
-          <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 28px' }}>We only request access to files FlowDrive creates.</p>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <button onClick={handleGoogleConnect} style={S.btnPrimary}>
-              <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.28-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24s.92 7.54 2.56 10.78l7.97-6.19z"/>
-                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-              </svg>
-              Connect Google Account
-            </button>
-            <button onClick={handleLogout} style={S.btnOutline}>
-              <LogOut size={15} /> Log Out
-            </button>
-          </div>
+
+          <Card className="border-4 border-black shadow-[8px_8px_0_0_#000] rounded-base bg-background text-center">
+            <CardHeader>
+              <div className="w-16 h-16 rounded-base border-4 border-black bg-main flex items-center justify-center shadow-shadow mx-auto mb-4">
+                <Cloud size={32} />
+              </div>
+              <CardTitle className="font-heading text-2xl">Link Google Drive Space</CardTitle>
+              <CardDescription className="font-base">
+                Welcome, <strong>{user?.username}</strong>. Connect your Google account to store permanent files. We only request access to files FlowDrive creates.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              {error && (
+                <Alert className="border-2 border-black bg-red-300 text-black rounded-base text-left">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle className="font-heading">Error</AlertTitle>
+                  <AlertDescription className="font-base">{error}</AlertDescription>
+                </Alert>
+              )}
+              <Button id="connect-google" className="w-full" onClick={handleGoogleConnect}>
+                <Cloud size={16} /> Connect Google Account
+              </Button>
+              <Button variant="neutral" className="w-full" onClick={handleLogout}>
+                <LogOut size={16} /> Log Out
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
 
-  // ─── Dashboard ────────────────────────────────────────────────────────────
-  const filteredFiles = files.filter(f => {
-    if (f.intent !== activeTab) return false;
-    if (searchQuery && !f.filename.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
-
-  const INITIAL_FILE_LIMIT = 5;
-  const displayedFiles = showAllFiles ? filteredFiles : filteredFiles.slice(0, INITIAL_FILE_LIMIT);
-  const hasMoreFiles = filteredFiles.length > INITIAL_FILE_LIMIT;
-
-  const INITIAL_DRIVE_LIMIT = 4;
-  const displayedDriveAccounts = showAllDrives ? driveAccounts : driveAccounts.slice(0, INITIAL_DRIVE_LIMIT);
-  const hasMoreDrives = driveAccounts.length > INITIAL_DRIVE_LIMIT;
-
-  const dropZoneClass = ['drop-zone', isDragging ? 'drag-over' : '']
-    .filter(Boolean).join(' ');
-
+  // ─── Main Dashboard ────────────────────────────────────────────────────────
   return (
-    <div className="space-canvas" style={{ color: '#f8fafc', position: 'relative' }}>
-      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <Prism
-          animationType="3drotate"
-          timeScale={1.2}
-          height={2.3}
-          baseWidth={4.4}
-          scale={2.5}
-          hueShift={0}
-          colorFrequency={4}
-          noise={0.8}
-          glow={0.4}
-        />
-      </div>
-      
-      
-      
+    <TooltipProvider>
+      <div className="neo-bg min-h-screen">
+        <Toaster richColors position="bottom-right" />
 
-      {/* ─── CUSTOM CONFIRMATION MODAL (GLASSMOPHIC SPACE) ────────────────────── */}
-      {confirmModal.isOpen && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'rgba(4, 7, 17, 0.75)',  
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px'
-          }}
-          onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-        >
-          <div
-            className="paper-card"
-            style={{
-              maxWidth: '440px', width: '100%', padding: '28px',
-              border: '1px solid rgba(255, 255, 255, 0.18)',
-              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
-              position: 'relative'
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
-              <div
-                style={{
-                  width: '44px', height: '44px', borderRadius: '12px',
-                  background: confirmModal.danger ? 'rgba(239, 68, 68, 0.2)' : 'rgba(99, 102, 241, 0.2)',
-                  color: confirmModal.danger ? '#fca5a5' : '#38bdf8',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  border: confirmModal.danger ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(99, 102, 241, 0.35)'
-                }}
-              >
-                {confirmModal.danger ? <AlertCircle size={22} /> : <Orbit size={22} />}
-              </div>
-              <div>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc', margin: 0 }}>
-                  {confirmModal.title}
-                </h3>
-                <span style={{ fontSize: '12px', color: '#f8fafc' }}>Antigravity Space Workspace</span>
-              </div>
-            </div>
-
-            <p style={{ fontSize: '14px', color: '#94a3b8', lineHeight: 1.5, margin: '0 0 24px' }}>
-              {confirmModal.message}
-            </p>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                style={{
-                  padding: '9px 18px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.08)',
-                   
-                  border: '1px solid rgba(255, 255, 255, 0.14)', color: '#f8fafc', fontSize: '14px', fontWeight: 600,
-                  cursor: 'pointer', fontFamily: 'inherit'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmModal.onConfirm}
-                style={{
-                  padding: '9px 18px', borderRadius: '8px',
-                  background: confirmModal.danger ? '#ef4444' : '#6366f1',
-                  color: '#FFFFFF', border: 'none', fontSize: '14px', fontWeight: 600,
-                  cursor: 'pointer', fontFamily: 'inherit',
-                  boxShadow: confirmModal.danger ? '0 0 20px rgba(239, 68, 68, 0.4)' : '0 0 20px rgba(99, 102, 241, 0.4)'
-                }}
-              >
-                {confirmModal.confirmText}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ─── CUSTOM TOAST NOTIFICATION BANNER (GLASSMOPHIC SPACE) ───────────── */}
-      {toast.isOpen && (
-        <div
-          style={{
-            position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999,
-            display: 'flex', alignItems: 'center', gap: '12px',
-            padding: '14px 20px', borderRadius: '12px', background: 'rgba(18, 30, 54, 0.85)',
-             
-            border: '1px solid rgba(255, 255, 255, 0.18)',
-            boxShadow: '0 15px 35px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.2)', maxWidth: '380px'
-          }}
-        >
-          <div
-            style={{
-              width: '28px', height: '28px', borderRadius: '50%',
-              background: toast.type === 'error' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-              color: toast.type === 'error' ? '#fca5a5' : '#6ee7b7',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-            }}
-          >
-            {toast.type === 'error' ? <AlertCircle size={16} /> : <Check size={16} />}
-          </div>
-          <span style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc', flex: 1 }}>
-            {toast.message}
-          </span>
-          <button
-            onClick={() => setToast(prev => ({ ...prev, isOpen: false }))}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#94a3b8' }}
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
-
-      {/* ─── Top Nav Header (Transparent Floating Glass Bar with Soft Corners) ── */}
-      <div style={{ position: 'sticky', top: '16px', zIndex: 50, padding: '0 32px', boxSizing: 'border-box', marginBottom: '16px' }}>
-        <nav
-          className="paper-card"
-          style={{
-            width: '100%',
-            height: '64px',
-            display: 'flex',
-            alignItems: 'center',
-            justify: 'space-between',
-            padding: '0 28px',
-            borderRadius: '20px',
-            boxSizing: 'border-box',
-            background: 'rgba(15, 25, 48, 0.45)',
-            backdropFilter: 'blur(16px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(16px) saturate(180%)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-          }}
-        >
+        {/* ── Navbar ── */}
+        <nav className="sticky top-0 z-50 bg-background border-b-4 border-black px-5 h-[60px] flex items-center justify-between">
           {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)', borderRadius: '12px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 15px rgba(99, 102, 241, 0.4)' }}>
-              <Orbit color="white" size={18} />
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-base border-2 border-black bg-main flex items-center justify-center shadow-shadow">
+              <Orbit size={16} />
             </div>
-            <span style={{ fontWeight: 800, fontSize: '20px', letterSpacing: '-0.5px' }} className="text-gradient">FlowDrive</span>
+            <span className="font-heading text-xl">FlowDrive</span>
           </div>
 
-          {/* User badge, GitHub repo button & logout — locked to top-right */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
-            {/* Standalone User Badge Pill */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255, 255, 255, 0.06)', padding: '4px 14px 4px 6px', borderRadius: '9999px', border: '1px solid rgba(255, 255, 255, 0.14)' }}>
-              <div style={{ width: '30px', height: '30px', background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: '#FFFFFF', flexShrink: 0 }}>
-                {userInitials(user?.username)}
-              </div>
-              <span style={{ fontSize: '14px', color: '#f8fafc', fontWeight: 600 }}>{user?.username}</span>
+          {/* Right */}
+          <div className="flex items-center gap-3">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <a href="https://github.com/ShubhangDoley/FlowDrive" target="_blank" rel="noreferrer">
+                  <Button variant="neutral" size="icon" className="rounded-base">
+                    <Github size={16} />
+                  </Button>
+                </a>
+              </TooltipTrigger>
+              <TooltipContent>View on GitHub</TooltipContent>
+            </Tooltip>
+
+            <div className="flex items-center gap-2">
+              <Avatar className="w-8 h-8 border-2 border-black">
+                <AvatarFallback className="bg-main text-black font-heading text-xs">
+                  {userInitials(user?.username)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="font-base text-sm font-semibold hidden sm:block">{user?.username}</span>
             </div>
 
-            {/* Standalone GitHub Link Button - perfectly centered glass circle */}
-            <a
-              href="https://github.com/ShubhangDoley/FlowDrive"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="View FlowDrive Repository on GitHub"
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '50%',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
-                color: '#38bdf8',
-                textDecoration: 'none',
-                transition: 'all 0.2s ease',
-                boxSizing: 'border-box',
-                flexShrink: 0
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)';
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.14)';
-              }}
-            >
-              <GithubIcon size={18} color="#38bdf8" />
-            </a>
-
-            {/* Standalone Logout Button */}
-            <button
-              id="logout-btn"
-              onClick={handleLogout}
-              title="Log out"
-              style={S.btnIcon}
-            >
-              <LogOut size={16} />
-            </button>
+            <Button variant="neutral" size="sm" onClick={handleLogout} className="rounded-base">
+              <LogOut size={14} /> <span className="hidden sm:inline">Log Out</span>
+            </Button>
           </div>
         </nav>
-      </div>
 
-      {/* ─── Main Content Container ───────────────────────────────────────────── */}
-      <main style={{ width: '100%', padding: '32px 32px 80px', position: 'relative', zIndex: 1, boxSizing: 'border-box' }}>
+        {/* ── Main Content ── */}
+        <main className="max-w-[1400px] mx-auto px-4 md:px-6 py-6 grid lg:grid-cols-[280px_1fr] gap-6">
 
-        {/* ─── TOP SECTION: Total Statistics Bar ─────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '32px', alignItems: 'stretch' }}>
+          {/* ── LEFT SIDEBAR ── */}
+          <aside className="flex flex-col gap-4">
 
-          {/* Card 1: Total Storage Capacity */}
-          <div className="paper-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', boxSizing: 'border-box' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '14px' }}>
-                <div style={{ width: '40px', height: '40px', background: 'rgba(99, 102, 241, 0.25)',  borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', flexShrink: 0, border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                  <HardDrive size={20} />
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+
+              {/* Storage card */}
+              <Card className="border-2 border-black shadow-shadow rounded-base bg-background">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <HardDrive size={16} />
+                    <p className="font-heading text-sm">Storage Used</p>
+                  </div>
+                  <Progress
+                    value={totalUsagePct}
+                    className="h-3 mb-1 border-2 border-black rounded-base [&>div]:bg-main"
+                  />
+                  <p className="font-base text-xs text-right mt-1">
+                    {fmtBytes(totalUsedBytes)} / {totalLimitBytes > 0 ? fmtBytes(totalLimitBytes) : '—'}
+                    {' '}({totalUsagePct}%)
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Stats row */}
+              <div className="grid grid-cols-2 gap-3">
+                <Card className="border-2 border-black shadow-shadow rounded-base bg-main">
+                  <CardContent className="p-4 text-center">
+                    <p className="font-heading text-3xl">{driveAccounts.length}</p>
+                    <p className="font-base text-xs mt-1">Drives</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-2 border-black shadow-shadow rounded-base bg-background">
+                  <CardContent className="p-4 text-center">
+                    <p className="font-heading text-3xl">{files.length}</p>
+                    <p className="font-base text-xs mt-1">Files</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* Drive Accounts */}
+            <Card className="border-2 border-black shadow-shadow rounded-base bg-background">
+              <CardHeader className="pb-2 px-4 pt-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="font-heading text-base flex items-center gap-2">
+                    <Cloud size={16} /> Drive Accounts
+                  </CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="neutral" size="icon" className="h-7 w-7 rounded-base" onClick={handleGoogleConnect}>
+                        <Plus size={14} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Add Google Drive</TooltipContent>
+                  </Tooltip>
                 </div>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: totalUsagePct > 85 ? '#fca5a5' : '#38bdf8', background: totalUsagePct > 85 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(56, 189, 248, 0.15)', padding: '4px 10px', borderRadius: '9999px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  {totalUsagePct}% filled
-                </span>
-              </div>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Total Space Capacity</div>
-              <div style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc', marginBottom: '12px' }}>
-                {fmtBytes(totalUsedBytes)} <span style={{ fontSize: '14px', fontWeight: 500, color: '#94a3b8' }}>/ {totalLimitBytes ? fmtBytes(totalLimitBytes) : 'Unlimited'}</span>
-              </div>
-            </div>
-            {/* Aggregate Storage Line Bar */}
-            <div style={{ height: '8px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${totalUsagePct}%`, background: totalUsagePct > 85 ? '#ef4444' : 'linear-gradient(90deg, #6366f1, #38bdf8)', borderRadius: '4px', transition: 'width 0.3s ease' }} />
-            </div>
-          </div>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                {driveError && (
+                  <Alert className="mb-3 border-2 border-black bg-red-300 rounded-base text-sm">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="font-base">{driveError}</AlertDescription>
+                  </Alert>
+                )}
 
-          {/* Card 2: Connected Google Drives */}
-          <div className="paper-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', boxSizing: 'border-box' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                <div style={{ width: '40px', height: '40px', background: 'rgba(99, 102, 241, 0.25)',  borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', flexShrink: 0, border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                  <Cloud size={20} />
-                </div>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: '#f8fafc', background: 'rgba(99, 102, 241, 0.18)', padding: '4px 10px', borderRadius: '9999px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  {driveAccounts.length} Active
-                </span>
-              </div>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Connected Drives</div>
-              <div style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc', marginBottom: '4px' }}>
-                {driveAccounts.length} {driveAccounts.length === 1 ? 'Drive' : 'Drives'} Connected
-              </div>
-            </div>
-            <p style={{ fontSize: '14px', color: '#94a3b8', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              Primary: <span style={{ color: '#f8fafc', fontWeight: 600 }}>{driveAccounts.find(a => a.is_default)?.account_email || 'None'}</span>
-            </p>
-          </div>
-
-          {/* Card 3: Total Files Stored */}
-          <div className="paper-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', boxSizing: 'border-box' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                <div style={{ width: '40px', height: '40px', background: 'rgba(99, 102, 241, 0.25)',  borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', flexShrink: 0, border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                  <FileIcon size={20} />
-                </div>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: '#f8fafc', background: 'rgba(99, 102, 241, 0.18)', padding: '4px 10px', borderRadius: '9999px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  Synced
-                </span>
-              </div>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Total Files Stored</div>
-              <div style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc', marginBottom: '4px' }}>
-                {files.length} {files.length === 1 ? 'File' : 'Files'}
-              </div>
-            </div>
-            <p style={{ fontSize: '14px', color: '#94a3b8', margin: 0 }}>
-              <span style={{ color: '#38bdf8', fontWeight: 600 }}>{files.filter(f => f.intent === 'permanent').length}</span> Permanent · <span style={{ color: '#f8fafc', fontWeight: 600 }}>{files.filter(f => f.intent === 'temporary').length}</span> Temp
-            </p>
-          </div>
-
-        </div>
-
-        {/* ─── TWO COLUMN LAYOUT: Left Sidebar (Drives) + Main Right Area ───── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(340px, 420px) 1fr', gap: '28px', alignItems: 'start' }} className="grid-cols-1 lg:grid-cols-[420px_1fr]">
-
-          {/* ─── LEFT COLUMN: Connected Drives & Individual Stats ─────────────── */}
-          <aside className="paper-card" style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', margin: 0 }}>Connected Drives</h2>
-              <button
-                onClick={handleGoogleConnect}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(99, 102, 241, 0.25)',  color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.35)', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-              >
-                <Plus size={14} /> Add Drive
-              </button>
-            </div>
-
-            {driveError && (
-              <div className="error-card" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-                <AlertCircle size={16} style={{ flexShrink: 0 }} />
-                <span>{driveError}</span>
-              </div>
-            )}
-
-            {driveAccountsLoading && driveAccounts.length === 0 ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <RefreshCw size={16} className="animate-spin" /> Loading drives…
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {displayedDriveAccounts.map(account => {
-                  const usagePct = account.storage?.usage_pct || 0;
-                  return (
-                    <div
-                      key={account.id}
-                      style={{
-                        padding: '16px', background: account.is_default ? 'rgba(99, 102, 241, 0.18)' : 'rgba(255, 255, 255, 0.03)',
-                         
-                        border: account.is_default ? '1.5px solid #6366f1' : '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px',
-                        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.12)'
-                      }}
-                    >
-                      {/* Account info */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        {account.avatar_url ? (
-                          <img src={account.avatar_url} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
-                        ) : (
-                          <div style={{ width: '36px', height: '36px', background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '14px', flexShrink: 0 }}>
-                            {userInitials(account.display_name || account.account_email)}
-                          </div>
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={account.account_email}>
+                {driveAccountsLoading ? (
+                  <div className="flex items-center justify-center py-6 gap-2 text-sm font-base">
+                    <RefreshCw size={14} className="animate-spin" /> Loading…
+                  </div>
+                ) : driveAccounts.length === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="font-base text-sm mb-3">No drives connected</p>
+                    <Button className="w-full" onClick={handleGoogleConnect}>
+                      <Plus size={14} /> Connect Drive
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {displayedDrives.map(account => (
+                      <div
+                        key={account.id}
+                        className={`border-2 rounded-base p-3 cursor-pointer transition-all ${
+                          selectedDriveAccountId === account.id
+                            ? 'border-black bg-main shadow-shadow'
+                            : 'border-black bg-secondary-background hover:bg-main/40'
+                        }`}
+                        onClick={() => setSelectedDriveAccountId(account.id)}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Avatar className="w-6 h-6 border border-black shrink-0">
+                              <AvatarFallback className="bg-background text-black font-heading text-[10px]">
+                                {userInitials(account.account_email)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-base text-xs font-semibold truncate" title={account.account_email}>
                               {account.account_email}
                             </span>
                           </div>
                           {account.is_default && (
-                            <span style={{ display: 'inline-block', background: '#6366f1', color: 'white', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', marginTop: '4px' }}>
-                              Primary Default
-                            </span>
+                            <Badge className="text-[10px] border-2 border-black bg-background text-black shrink-0">Default</Badge>
                           )}
                         </div>
-                      </div>
-
-                      {/* Individual Storage Filled Percentage Line Bar */}
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>
-                          <span>{fmtBytes(account.storage.used_bytes)} / {account.storage.limit_bytes ? fmtBytes(account.storage.limit_bytes) : '∞'}</span>
-                          <span style={{ fontWeight: 700, color: usagePct > 85 ? '#fca5a5' : '#38bdf8' }}>{usagePct}%</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-base text-xs opacity-70">{account.storage?.usage_pct ?? 0}% used</span>
+                          <div className="flex gap-1">
+                            {!account.is_default && (
+                              <Button
+                                variant="neutral" size="sm"
+                                className="h-6 px-2 text-[10px] rounded-base"
+                                onClick={e => { e.stopPropagation(); handleSetDefaultDrive(account.id); }}
+                              >
+                                <Star size={10} /> Default
+                              </Button>
+                            )}
+                            <Button
+                              variant="neutral" size="sm"
+                              className="h-6 px-2 text-[10px] rounded-base border-black text-red-700 hover:bg-red-300"
+                              onClick={e => { e.stopPropagation(); handleDisconnectDrive(account); }}
+                            >
+                              <X size={10} />
+                            </Button>
+                          </div>
                         </div>
-                        <div style={{ height: '6px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${Math.min(usagePct, 100)}%`, background: usagePct > 85 ? '#ef4444' : '#6366f1', borderRadius: '3px', transition: 'width 0.3s ease' }} />
-                        </div>
                       </div>
+                    ))}
 
-                      {/* Action buttons */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                        {!account.is_default && (
-                          <button
-                            onClick={() => handleSetDefaultDrive(account.id)}
-                            style={{ flex: 1, background: 'rgba(255, 255, 255, 0.06)',  border: '1px solid rgba(255, 255, 255, 0.12)', color: '#f8fafc', borderRadius: '6px', padding: '6px 10px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-                          >
-                            Set Default
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleDisconnectDrive(account)}
-                          style={{ flex: account.is_default ? 1 : 'none', background: 'rgba(239, 68, 68, 0.15)',  border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', borderRadius: '6px', padding: '6px 10px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-                        >
-                          Disconnect
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* Read More / View All Toggle for Connected Drives */}
-                {(hasMoreDrives || showAllDrives) && (
-                  <div style={{ marginTop: '8px', textAlign: 'center' }}>
-                    <button
-                      onClick={() => setShowAllDrives(prev => !prev)}
-                      style={{
-                        background: 'rgba(99, 102, 241, 0.18)',
-                        border: '1px solid rgba(165, 180, 252, 0.35)',
-                        color: '#a5b4fc',
-                        borderRadius: '8px',
-                        padding: '8px 16px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        width: '100%',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s ease',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.3)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.18)'}
-                    >
-                      {showAllDrives ? 'Show Less' : `View All (${driveAccounts.length} drives)`}
-                    </button>
+                    {(hasMoreDrives || showAllDrives) && (
+                      <Button variant="neutral" className="w-full mt-1 rounded-base text-xs"
+                        onClick={() => setShowAllDrives(p => !p)}>
+                        {showAllDrives ? 'Show Less' : `View All (${driveAccounts.length})`}
+                      </Button>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
+              </CardContent>
+            </Card>
           </aside>
 
-          {/* ─── RIGHT COLUMN: Upload Hero Dropzone & Recent Files Table ───────── */}
-          <section style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          {/* ── RIGHT MAIN COLUMN ── */}
+          <section className="flex flex-col gap-5">
 
-            {/* ─── Destination Options & Multi-File Hero Drop Zone ─────────────── */}
-            <div className="paper-card" style={{ padding: '28px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'stretch' }} className="grid-cols-1 md:grid-cols-2">
+            {/* Upload Destination + Drop Zone */}
+            <Card className="border-2 border-black shadow-shadow rounded-base bg-background">
+              <CardContent className="p-5">
+                <div className="grid md:grid-cols-2 gap-5">
 
-                {/* LEFT HALF: Destination Selection & Target Drive / Expiry Options */}
-                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div>
-                    <p style={{ fontSize: '12px', fontWeight: 700, color: '#f8fafc', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Target Destination for New Files</p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                      {[
-                        { value: 'permanent', label: 'Permanent Storage',  sub: 'Google Drive Space', icon: <Cloud  size={18} color={uploadIntent === 'permanent'  ? '#FFFFFF' : '#94a3b8'} /> },
-                        { value: 'temporary', label: 'Temporary Share',    sub: 'Cloudflare R2 · Auto-deletes', icon: <Clock size={18} color={uploadIntent === 'temporary'  ? '#FFFFFF' : '#94a3b8'} /> },
-                      ].map(({ value, label, sub, icon }) => (
-                        <button
-                          key={value}
-                          id={`dest-${value}`}
-                          onClick={() => setUploadIntent(value)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: '12px', height: '60px',
-                            padding: '10px 14px', borderRadius: '12px', textAlign: 'left',
-                            border:      uploadIntent === value ? '1.5px solid #6366f1' : '1px solid rgba(255, 255, 255, 0.12)',
-                            background:  uploadIntent === value ? 'rgba(99, 102, 241, 0.22)' : 'rgba(255, 255, 255, 0.03)',
-                            color:       uploadIntent === value ? '#FFFFFF' : '#f8fafc',
-                            cursor: 'pointer', transition: 'all 0.2s ease', fontFamily: 'inherit',
-                            boxSizing: 'border-box', boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.1)'
-                          }}
-                        >
-                          <div style={{ flexShrink: 0 }}>{icon}</div>
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <p style={{ fontSize: '13px', fontWeight: 700, color: uploadIntent === value ? '#FFFFFF' : '#f8fafc', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</p>
-                            <p style={{ fontSize: '11px', color: uploadIntent === value ? '#FFFFFF' : '#94a3b8', opacity: uploadIntent === value ? 0.85 : 1, margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</p>
-                          </div>
-                        </button>
-                      ))}
+                  {/* Left: destination picker */}
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <p className="font-heading text-sm mb-2 uppercase tracking-wide">Upload Destination</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { value: 'permanent', label: 'Permanent',    sub: 'Google Drive',           icon: <Cloud  size={16} /> },
+                          { value: 'temporary', label: 'Temporary',    sub: 'R2 · Auto-deletes',      icon: <Clock  size={16} /> },
+                        ].map(({ value, label, sub, icon }) => (
+                          <button
+                            key={value} id={`dest-${value}`}
+                            onClick={() => setUploadIntent(value)}
+                            className={`flex items-center gap-2 p-3 rounded-base border-2 border-black text-left transition-all cursor-pointer font-base
+                              ${uploadIntent === value ? 'bg-main shadow-shadow translate-x-[2px] translate-y-[2px]' : 'bg-secondary-background hover:bg-main/50 shadow-shadow'}`}
+                          >
+                            <div className="shrink-0">{icon}</div>
+                            <div className="min-w-0">
+                              <p className="font-heading text-sm">{label}</p>
+                              <p className="text-xs opacity-70 truncate">{sub}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
-                    {/* Target Google Drive Account Selector (Permanent only) */}
+                    {/* Target drive selector */}
                     {uploadIntent === 'permanent' && driveAccounts.length > 0 && (
-                      <div style={{ background: 'rgba(255, 255, 255, 0.03)',  border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px', padding: '14px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: 700, color: '#f8fafc', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Select Target Google Drive:
-                        </label>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '150px', overflowY: 'auto' }}>
+                      <div>
+                        <p className="font-heading text-xs uppercase tracking-wide mb-1.5">Target Drive</p>
+                        <div className="border-2 border-black rounded-base overflow-hidden">
                           {driveAccounts.map(account => (
-                            <label
-                              key={account.id}
-                              style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '42px',
-                                padding: '0 12px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.05)',
-                                border: selectedDriveAccountId === account.id ? '1.5px solid #6366f1' : '1px solid rgba(255, 255, 255, 0.12)',
-                                cursor: 'pointer', transition: 'all 0.2s ease', boxSizing: 'border-box'
-                              }}
+                            <label key={account.id}
+                              className={`flex items-center gap-2 px-3 py-2 cursor-pointer border-b-2 border-black last:border-b-0 font-base text-sm
+                                ${selectedDriveAccountId === account.id ? 'bg-main' : 'bg-secondary-background hover:bg-main/40'}`}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                                <input
-                                  type="radio"
-                                  name="drive_account_choice"
-                                  value={account.id}
-                                  checked={selectedDriveAccountId === account.id}
-                                  onChange={() => setSelectedDriveAccountId(account.id)}
-                                  style={{ accentColor: '#6366f1', flexShrink: 0 }}
-                                />
-                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={account.account_email}>{account.account_email}</span>
-                                {account.is_default && (
-                                  <span style={{ background: 'rgba(99, 102, 241, 0.25)', color: '#38bdf8', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>
-                                    Default
-                                  </span>
-                                )}
-                              </div>
-                              <span style={{ fontSize: '11px', color: '#94a3b8', flexShrink: 0, marginLeft: '8px' }}>
-                                {account.storage?.usage_pct || 0}%
-                              </span>
+                              <input type="radio" name="drive_target" value={account.id}
+                                checked={selectedDriveAccountId === account.id}
+                                onChange={() => setSelectedDriveAccountId(account.id)}
+                                className="accent-black" />
+                              <span className="truncate">{account.account_email}</span>
+                              {account.is_default && <Badge className="ml-auto text-[10px] border border-black bg-background text-black">Default</Badge>}
                             </label>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Expiry picker (Temporary only) - Glassmorphic Dropdown */}
+                    {/* Expiry picker */}
                     {uploadIntent === 'temporary' && (
-                      <div style={{ position: 'relative' }}>
-                        <label htmlFor="expiry-select" style={{ fontSize: '11px', fontWeight: 700, color: '#f8fafc', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Auto-Deletion Period</label>
-                        
-                        {/* Glass Trigger Button */}
-                        <div
-                          onClick={() => setIsExpiryDropdownOpen(prev => !prev)}
-                          style={{
-                            ...S.input,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justify: 'space-between',
-                            cursor: 'pointer',
-                            userSelect: 'none',
-                            background: 'rgba(255, 255, 255, 0.08)',
-                            border: isExpiryDropdownOpen ? '1px solid #6366f1' : '1px solid rgba(255, 255, 255, 0.16)',
-                            boxShadow: isExpiryDropdownOpen ? '0 0 15px rgba(99, 102, 241, 0.3)' : 'none',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Clock size={16} color="#38bdf8" />
-                            <span style={{ fontWeight: 600, color: '#f8fafc' }}>
-                              {expiresHours === '1' && '1 hour (60 minutes)'}
-                              {expiresHours === '24' && '24 hours (1 day)'}
-                              {expiresHours === '168' && '7 days (1 week)'}
-                            </span>
+                      <div>
+                        <p className="font-heading text-xs uppercase tracking-wide mb-1.5">Auto-Deletion Period</p>
+                        <Select value={expiresHours} onValueChange={setExpiresHours}>
+                          <SelectTrigger id="expiry-select" className="border-2 border-black rounded-base bg-secondary-background font-base">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="border-2 border-black rounded-base">
+                            <SelectItem value="1"   className="font-base">1 hour (60 minutes)</SelectItem>
+                            <SelectItem value="24"  className="font-base">24 hours (1 day)</SelectItem>
+                            <SelectItem value="168" className="font-base">7 days (1 week)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: Drop zone */}
+                  <div
+                    id="upload-dropzone"
+                    className={dropZoneClass}
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setIsDragging(false); }}
+                    onDrop={e => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files) addFilesToQueue(e.dataTransfer.files); }}
+                  >
+                    <div className="w-14 h-14 rounded-base border-2 border-black bg-main flex items-center justify-center shadow-shadow">
+                      <Upload size={28} />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-heading text-base">Drop files to upload</p>
+                      <p className="font-base text-sm opacity-70">or click to browse</p>
+                    </div>
+                    <input type="file" multiple ref={fileInputRef} style={{ display: 'none' }}
+                      onChange={e => { if (e.target.files) addFilesToQueue(e.target.files); e.target.value = ''; }} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Upload Queue */}
+            {uploadQueue.length > 0 && (
+              <Card className="border-2 border-black shadow-shadow rounded-base bg-background">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <Upload size={16} />
+                      <h3 className="font-heading text-base">Upload Queue</h3>
+                      <Badge className="border-2 border-black bg-main text-black text-xs">
+                        {completedCount}/{totalQueueCount} {uploadingCount > 0 ? `(${uploadingCount} active)` : ''}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Concurrency */}
+                      <div className="flex border-2 border-black rounded-base overflow-hidden">
+                        {[{ level: 1, label: '1x' }, { level: 3, label: '3x' }, { level: 5, label: '5x' }].map(({ level, label }) => (
+                          <button key={level} onClick={() => setMaxConcurrency(level)}
+                            className={`px-3 py-1 text-xs font-heading border-r-2 border-black last:border-r-0 transition-colors cursor-pointer
+                              ${maxConcurrency === level ? 'bg-main' : 'bg-secondary-background hover:bg-main/50'}`}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <Button variant="neutral" size="sm" className="rounded-base text-xs" onClick={retryFailedQueue}>
+                        <RefreshCw size={12} /> Retry
+                      </Button>
+                      <Button variant="neutral" size="sm" className="rounded-base text-xs" onClick={clearCompletedQueue}>
+                        <X size={12} /> Clear Done
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Overall progress */}
+                  {uploadingCount > 0 && (
+                    <Progress value={overallQueuePct} className="h-2 mb-4 border-2 border-black rounded-base [&>div]:bg-main" />
+                  )}
+
+                  {/* Queue items */}
+                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+                    {uploadQueue.map(item => (
+                      <div key={item.id} className="border-2 border-black rounded-base p-3 bg-secondary-background">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-base border-2 border-black bg-background flex items-center justify-center shrink-0">
+                            <FileIcon size={14} />
                           </div>
-                          <ChevronDown size={16} color="#a5b4fc" style={{ transform: isExpiryDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="font-base text-sm font-semibold truncate">{item.file.name}</span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <QueueStatusBadge status={item.status} />
+                                <Button variant="neutral" size="icon" className="h-6 w-6 rounded-base"
+                                  onClick={() => cancelOrRemoveQueueItem(item.id)}>
+                                  <X size={12} />
+                                </Button>
+                              </div>
+                            </div>
+                            <p className="font-base text-xs opacity-60">{fmtBytes(item.total)}</p>
+                          </div>
                         </div>
 
-                        {/* Hidden select for accessibility & test bindings */}
-                        <select
-                          id="expiry-select"
-                          value={expiresHours}
-                          onChange={e => setExpiresHours(e.target.value)}
-                          style={{ display: 'none' }}
-                        >
-                          <option value="1">1 hour</option>
-                          <option value="24">24 hours</option>
-                          <option value="168">7 days</option>
-                        </select>
-
-                        {/* Floating Glassmorphic Dropdown Card Menu */}
-                        {isExpiryDropdownOpen && (
-                          <>
-                            {/* Invisible backdrop to dismiss on click outside */}
-                            <div
-                              style={{ position: 'fixed', inset: 0, zIndex: 90 }}
-                              onClick={() => setIsExpiryDropdownOpen(false)}
-                            />
-                            <div
-                              className="paper-card"
-                              style={{
-                                position: 'absolute',
-                                top: '100%',
-                                left: 0,
-                                right: 0,
-                                marginTop: '6px',
-                                zIndex: 100,
-                                padding: '6px',
-                                background: 'rgba(20, 30, 50, 0.92)',
-                                backdropFilter: 'blur(24px) saturate(190%)',
-                                WebkitBackdropFilter: 'blur(24px) saturate(190%)',
-                                border: '1px solid rgba(255, 255, 255, 0.2)',
-                                boxShadow: '0 16px 40px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
-                                borderRadius: '12px',
-                              }}
-                            >
-                              {[
-                                { value: '1', label: '1 hour', desc: 'Auto-deletes in 60 minutes' },
-                                { value: '24', label: '24 hours', desc: 'Auto-deletes tomorrow' },
-                                { value: '168', label: '7 days', desc: 'Auto-deletes in 1 week' },
-                              ].map((opt) => {
-                                const isSelected = expiresHours === opt.value;
-                                return (
-                                  <div
-                                    key={opt.value}
-                                    onClick={() => {
-                                      setExpiresHours(opt.value);
-                                      setIsExpiryDropdownOpen(false);
-                                    }}
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justify: 'space-between',
-                                      padding: '10px 14px',
-                                      borderRadius: '8px',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.15s ease',
-                                      background: isSelected ? 'rgba(99, 102, 241, 0.25)' : 'transparent',
-                                      color: isSelected ? '#FFFFFF' : '#f8fafc',
-                                      border: isSelected ? '1px solid rgba(165, 180, 252, 0.3)' : '1px solid transparent',
-                                    }}
-                                    onMouseEnter={e => {
-                                      if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-                                    }}
-                                    onMouseLeave={e => {
-                                      if (!isSelected) e.currentTarget.style.background = 'transparent';
-                                    }}
-                                  >
-                                    <div>
-                                      <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>{opt.label}</p>
-                                      <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0' }}>{opt.desc}</p>
-                                    </div>
-                                    {isSelected && <Check size={16} color="#38bdf8" />}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </>
+                        {item.status === 'uploading' && (
+                          <Progress value={item.progressPct} className="mt-2 h-2 border-2 border-black rounded-base [&>div]:bg-main" />
+                        )}
+                        {item.status === 'error' && item.errorMsg && (
+                          <p className="font-base text-xs text-red-700 mt-2">{item.errorMsg}</p>
                         )}
                       </div>
-                    )}
+                    ))}
                   </div>
-                </div>
-
-                {/* RIGHT HALF: Drag & Drop Hero Zone */}
-                <div
-                  id="upload-dropzone"
-                  className={dropZoneClass}
-                  style={{ minHeight: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', boxSizing: 'border-box' }}
-                  onClick={() => fileInputRef.current?.click()}
-                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setIsDragging(false); }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setIsDragging(false);
-                    if (e.dataTransfer.files) addFilesToQueue(e.dataTransfer.files);
-                  }}
-                >
-                  <div style={{ width: '56px', height: '56px', background: 'rgba(99, 102, 241, 0.25)',  border: '1px solid rgba(165, 180, 252, 0.35)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8', marginBottom: '12px' }}>
-                    <Upload size={26} />
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontWeight: 700, fontSize: '17px', color: '#f8fafc', margin: '0 0 4px' }}>Drop files to upload to space</p>
-                    <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0 }}>or click to browse multiple files from your computer</p>
-                  </div>
-                  <input
-                    type="file"
-                    multiple
-                    ref={fileInputRef}
-                    style={{ display: 'none' }}
-                    onChange={e => {
-                      if (e.target.files) addFilesToQueue(e.target.files);
-                      e.target.value = '';
-                    }}
-                  />
-                </div>
-
-              </div>
-            </div>
-
-            {/* ─── CANCELLABLE UPLOAD QUEUE PANEL ──────────────────────────────── */}
-            {uploadQueue.length > 0 && (
-              <div className="paper-card" style={{ padding: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Upload size={20} color="#38bdf8" />
-                    <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', margin: 0 }}>Space Upload Queue</h3>
-                    <span style={{ background: 'rgba(99, 102, 241, 0.22)',  color: '#38bdf8', fontSize: '12px', fontWeight: 700, padding: '3px 10px', borderRadius: '9999px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
-                      {completedCount} / {totalQueueCount} completed {uploadingCount > 0 ? `(${uploadingCount} active)` : ''}
-                    </span>
-                  </div>
-
-                  {/* Speed & Actions */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-
-                    {/* Concurrency Selector */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 255, 255, 0.04)',  border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', padding: '3px 4px' }}>
-                      <Zap size={14} color="#38bdf8" style={{ marginLeft: '6px' }} />
-                      {[
-                        { level: 1, label: '1x' },
-                        { level: 3, label: '3x Parallel' },
-                        { level: 5, label: '5x Turbo' },
-                      ].map(({ level, label }) => (
-                        <button
-                          key={level}
-                          onClick={() => setMaxConcurrency(level)}
-                          style={{
-                            padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
-                            border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s ease',
-                            background: maxConcurrency === level ? 'rgba(99, 102, 241, 0.22)' : 'transparent',
-                            color:      maxConcurrency === level ? '#FFFFFF' : '#94a3b8',
-                          }}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {uploadQueue.some(i => i.status === 'completed' || i.status === 'cancelled') && (
-                      <button
-                        onClick={clearCompletedQueue}
-                        style={{ background: 'rgba(255, 255, 255, 0.06)',  border: '1px solid rgba(255, 255, 255, 0.12)', color: '#f8fafc', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-                      >
-                        Clear Finished
-                      </button>
-                    )}
-                    {uploadQueue.some(i => i.status === 'error' || i.status === 'cancelled') && (
-                      <button
-                        onClick={retryFailedQueue}
-                        style={{ background: 'rgba(99, 102, 241, 0.22)',  border: '1px solid rgba(99, 102, 241, 0.35)', color: '#38bdf8', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
-                      >
-                        Retry Failed
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Overall Queue Progress Bar */}
-                <div style={{ marginBottom: '20px', background: 'rgba(255, 255, 255, 0.03)',  border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px', padding: '14px 18px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '8px' }}>
-                    <span>Overall Progress ({maxConcurrency}x parallel threads)</span>
-                    <span style={{ color: '#f8fafc', fontWeight: 700 }}>{fmtBytes(loadedQueueBytes)} / {fmtBytes(totalQueueBytes)} ({overallQueuePct}%)</span>
-                  </div>
-                  <div style={{ height: '8px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${overallQueuePct}%`, background: 'linear-gradient(90deg, #6366f1, #38bdf8)', borderRadius: '4px', transition: 'width 0.2s ease' }} />
-                  </div>
-                </div>
-
-                {/* Queue Items List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {uploadQueue.map(item => (
-                    <div
-                      key={item.id}
-                      style={{
-                        padding: '14px 18px', background: item.status === 'uploading' ? 'rgba(99, 102, 241, 0.18)' : 'rgba(255, 255, 255, 0.03)',
-                         
-                        border: item.status === 'uploading' ? '1.5px solid #6366f1' : '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '8px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
-                          <FileIcon size={18} color="#f8fafc" style={{ flexShrink: 0 }} />
-                          <span style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {item.file.name}
-                          </span>
-                          <span style={{ fontSize: '12px', color: '#94a3b8', flexShrink: 0 }}>
-                            ({fmtBytes(item.file.size)})
-                          </span>
-                        </div>
-
-                        {/* Status Badges & Controls */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                          {item.status === 'pending' && (
-                            <span style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#94a3b8', fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '9999px' }}>
-                              Pending
-                            </span>
-                          )}
-                          {item.status === 'uploading' && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#6366f1', color: 'white', fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '9999px' }}>
-                              <RefreshCw size={12} className="animate-spin" /> {item.progressPct}%
-                            </span>
-                          )}
-                          {item.status === 'completed' && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(16, 185, 129, 0.2)', color: '#6ee7b7', fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '9999px' }}>
-                              <Check size={13} /> Completed
-                            </span>
-                          )}
-                          {item.status === 'cancelled' && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255, 255, 255, 0.1)', color: '#94a3b8', fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '9999px' }}>
-                              Cancelled
-                            </span>
-                          )}
-                          {item.status === 'error' && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '9999px' }}>
-                              <AlertCircle size={13} /> Failed
-                            </span>
-                          )}
-
-                          {/* Cancel / Remove Cross Icon */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              cancelOrRemoveQueueItem(item.id);
-                            }}
-                            style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', cursor: 'pointer', padding: '5px', color: item.status === 'uploading' ? '#fca5a5' : '#94a3b8', transition: 'all 0.15s ease' }}
-                            title={item.status === 'uploading' ? 'Cancel active upload' : 'Remove from queue'}
-                          >
-                            <X size={15} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Per-item progress bar when uploading */}
-                      {item.status === 'uploading' && (
-                        <div>
-                          <div style={{ height: '4px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '2px', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${item.progressPct}%`, background: 'linear-gradient(90deg, #6366f1, #38bdf8)', borderRadius: '2px', transition: 'width 0.15s linear' }} />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Error message detail */}
-                      {item.status === 'error' && item.errorMsg && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <p style={{ fontSize: '12px', color: '#fca5a5', margin: 0 }}>
-                            {item.errorMsg}
-                          </p>
-                          {(item.errorMsg.includes('invalid_grant') || item.errorMsg.includes('expired') || item.errorMsg.includes('revoked') || item.errorMsg.includes('Google Drive client')) && (
-                            <button
-                              onClick={handleGoogleConnect}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                background: 'rgba(99, 102, 241, 0.25)',
-                                border: '1px solid rgba(165, 180, 252, 0.4)',
-                                color: '#38bdf8',
-                                borderRadius: '6px',
-                                padding: '6px 14px',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                width: 'fit-content',
-                                marginTop: '4px',
-                                transition: 'all 0.2s ease',
-                              }}
-                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.4)'}
-                              onMouseLeave={e => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.25)'}
-                            >
-                              <Plus size={14} /> Re-connect Google Drive Account ({item.accountEmail || 'shubhang.dev01@gmail.com'})
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             )}
 
-            {/* ─── Files Section: Tabs + Search + File Table ──────────────────── */}
+            {/* Files Section */}
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px', marginBottom: '16px' }}>
-                {/* Tab bar */}
-                <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.04)',   border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '10px', padding: '4px', gap: '4px', height: '44px', boxSizing: 'border-box', alignItems: 'center' }}>
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
+                {/* Tabs */}
+                <div className="flex border-2 border-black rounded-base overflow-hidden shadow-shadow">
                   {[
-                    { value: 'permanent', label: 'Google Drive Files' },
-                    { value: 'temporary', label: 'Cloudflare R2 Shares' },
+                    { value: 'permanent', label: 'Google Drive' },
+                    { value: 'temporary', label: 'R2 Shares' },
                   ].map(({ value, label }) => (
-                    <button
-                      key={value}
-                      id={`tab-${value}`}
-                      onClick={() => setActiveTab(value)}
-                      style={{
-                        padding: '6px 18px', borderRadius: '6px', fontSize: '14px', fontWeight: 600, height: '34px',
-                        border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s ease',
-                        background: activeTab === value ? 'rgba(99, 102, 241, 0.22)' : 'transparent',
-                        color:      activeTab === value ? '#FFFFFF' : '#94a3b8',
-                        boxShadow:  activeTab === value ? '0 0 15px rgba(99, 102, 241, 0.25)' : 'none',
-                      }}
-                    >
+                    <button key={value} id={`tab-${value}`} onClick={() => setActiveTab(value)}
+                      className={`px-4 py-2 text-sm font-heading border-r-2 border-black last:border-r-0 cursor-pointer transition-colors
+                        ${activeTab === value ? 'bg-main' : 'bg-secondary-background hover:bg-main/50'}`}>
                       {label}
                     </button>
                   ))}
                 </div>
 
                 {/* Search */}
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Search size={16} style={{ position: 'absolute', left: '14px', color: '#94a3b8', pointerEvents: 'none' }} />
-                  <input
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50" />
+                  <Input
                     id="search-files"
                     type="search"
-                    placeholder="Search files by name…"
+                    placeholder="Search files…"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    style={{ ...S.input, paddingLeft: '38px', width: '240px', height: '44px' }}
+                    className="pl-9 w-52 border-2 border-black rounded-base h-9"
                   />
                 </div>
               </div>
 
-              {/* Table Container */}
-              <div className="paper-card" style={{ overflow: 'hidden' }}>
-
-                {/* Table Header Bar */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid rgba(255, 255, 255, 0.12)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc' }}>
+              {/* File Table */}
+              <Card className="border-2 border-black shadow-shadow rounded-base bg-background overflow-hidden">
+                {/* Table header bar */}
+                <div className="flex items-center justify-between px-5 py-3 border-b-2 border-black">
+                  <div className="flex items-center gap-2">
+                    <span className="font-heading text-sm">
                       {activeTab === 'permanent' ? 'Google Drive Files' : 'Cloudflare R2 Files'}
                     </span>
-                    <span style={{ background: 'rgba(99, 102, 241, 0.2)', color: '#38bdf8', fontSize: '12px', fontWeight: 700, padding: '2px 10px', borderRadius: '9999px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
-                      {filteredFiles.length}
-                    </span>
+                    <Badge className="border-2 border-black bg-main text-black text-xs">{filteredFiles.length}</Badge>
                   </div>
-                  <button
-                    onClick={fetchFiles}
-                    title="Refresh list"
-                    style={S.btnIcon}
-                  >
-                    <RefreshCw size={15} />
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="neutral" size="icon" className="h-7 w-7 rounded-base" onClick={fetchFiles}>
+                        <RefreshCw size={13} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Refresh</TooltipContent>
+                  </Tooltip>
                 </div>
 
-                {/* Empty state */}
                 {filteredFiles.length === 0 ? (
-                  <div style={{ padding: '64px 24px', textAlign: 'center' }}>
-                    <div style={{ width: '56px', height: '56px', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: '#f8fafc' }}>
-                      {activeTab === 'permanent'
-                        ? <Cloud size={26} />
-                        : <Clock size={26} />}
+                  <div className="py-16 text-center px-6">
+                    <div className="w-14 h-14 rounded-base border-2 border-black bg-secondary-background flex items-center justify-center mx-auto mb-4 shadow-shadow">
+                      {activeTab === 'permanent' ? <Cloud size={24} /> : <Clock size={24} />}
                     </div>
-                    <p style={{ fontSize: '16px', fontWeight: 600, color: '#f8fafc', margin: '0 0 6px' }}>
+                    <p className="font-heading text-base mb-1">
                       {searchQuery ? 'No matching files found' : `No ${activeTab} files yet`}
                     </p>
-                    {!searchQuery && (
-                      <p style={{ fontSize: '14px', color: '#94a3b8', margin: 0 }}>
-                        Drop files above to store them in your space workspace.
-                      </p>
-                    )}
+                    {!searchQuery && <p className="font-base text-sm opacity-60">Drop files above to upload to your space</p>}
                   </div>
                 ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', minWidth: '640px', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.12)', background: 'rgba(255, 255, 255, 0.06)' }}>
-                          <th style={{ width: activeTab === 'permanent' ? '35%' : '42%', padding: '12px 24px', textAlign: 'left', fontSize: '12px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.04em' }}>File Name</th>
-                          {activeTab === 'permanent' && (
-                            <th style={{ width: '25%', padding: '12px 24px', textAlign: 'left', fontSize: '12px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Target Drive</th>
-                          )}
-                          <th style={{ width: '18%', padding: '12px 24px', textAlign: 'left', fontSize: '12px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Uploaded</th>
-                          <th style={{ width: '12%', padding: '12px 24px', textAlign: 'left', fontSize: '12px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Size</th>
-                          {activeTab === 'temporary' && (
-                            <th style={{ width: '15%', padding: '12px 24px', textAlign: 'left', fontSize: '12px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Expires</th>
-                          )}
-                          <th style={{ width: '10%', padding: '12px 24px', textAlign: 'right', fontSize: '12px', fontWeight: 700, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {displayedFiles.map((f, idx) => {
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-b-2 border-black bg-main/30 hover:bg-main/30">
+                          <TableHead className="font-heading text-xs uppercase tracking-wide py-3 px-5">File Name</TableHead>
+                          {activeTab === 'permanent' && <TableHead className="font-heading text-xs uppercase tracking-wide py-3 px-5">Drive</TableHead>}
+                          <TableHead className="font-heading text-xs uppercase tracking-wide py-3 px-5">Uploaded</TableHead>
+                          <TableHead className="font-heading text-xs uppercase tracking-wide py-3 px-5">Size</TableHead>
+                          {activeTab === 'temporary' && <TableHead className="font-heading text-xs uppercase tracking-wide py-3 px-5">Expires</TableHead>}
+                          <TableHead className="font-heading text-xs uppercase tracking-wide py-3 px-5 text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {displayedFiles.map(f => {
                           const expiry = fmtExpiry(f.expires_at);
-                          const isExpiringSoon = expiry && expiry.includes('m left');
+                          const isExpiringSoon = expiry?.includes('m left');
                           return (
-                            <tr
-                              key={f.id}
-                              style={{ borderBottom: idx < displayedFiles.length - 1 ? '1px solid rgba(255, 255, 255, 0.12)' : 'none', transition: 'background 0.2s ease' }}
-                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'}
-                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                            >
-                              {/* Name */}
-                              <td style={{ padding: '14px 24px', verticalAlign: 'middle' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                                  <div style={{ width: '36px', height: '36px', background: 'rgba(255, 255, 255, 0.05)',  border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#38bdf8' }}>
-                                    <FileIcon size={16} />
+                            <TableRow key={f.id} className="border-b-2 border-black last:border-b-0 hover:bg-secondary-background transition-colors">
+                              <TableCell className="py-3 px-5">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-7 h-7 rounded-base border-2 border-black bg-secondary-background flex items-center justify-center shrink-0">
+                                    <FileIcon size={13} />
                                   </div>
-                                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={f.filename}>
-                                    {f.filename}
-                                  </span>
+                                  <span className="font-base text-sm font-semibold truncate" title={f.filename}>{f.filename}</span>
                                 </div>
-                              </td>
-
-                              {/* Target Drive (permanent only) */}
+                              </TableCell>
                               {activeTab === 'permanent' && (
-                                <td style={{ padding: '14px 24px', fontSize: '14px', color: '#38bdf8', fontWeight: 600, verticalAlign: 'middle', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <TableCell className="py-3 px-5 font-base text-sm opacity-70 truncate max-w-[160px]">
                                   {f.drive_account_email || 'Google Drive'}
-                                </td>
+                                </TableCell>
                               )}
-
-                              {/* Uploaded */}
-                              <td style={{ padding: '14px 24px', fontSize: '14px', color: '#94a3b8', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>{fmtDate(f.created_at)}</td>
-
-                              {/* Size */}
-                              <td style={{ padding: '14px 24px', fontSize: '14px', color: '#94a3b8', fontWeight: 500, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>{fmtBytes(f.size_bytes)}</td>
-
-                              {/* Expires (temporary only) */}
+                              <TableCell className="py-3 px-5 font-base text-sm opacity-60 whitespace-nowrap">{fmtDate(f.created_at)}</TableCell>
+                              <TableCell className="py-3 px-5 font-base text-sm opacity-60 whitespace-nowrap">{fmtBytes(f.size_bytes)}</TableCell>
                               {activeTab === 'temporary' && (
-                                <td style={{ padding: '14px 24px', fontSize: '14px', fontWeight: isExpiringSoon ? 700 : 500, color: isExpiringSoon ? '#fca5a5' : '#94a3b8', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                <TableCell className="py-3 px-5">
                                   {expiry ? (
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: isExpiringSoon ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.06)', padding: '2px 8px', borderRadius: '6px' }}>
-                                      <Clock size={12} /> {expiry}
-                                    </span>
+                                    <Badge className={`border-2 border-black text-xs ${isExpiringSoon ? 'bg-red-400' : 'bg-secondary-background'}`}>
+                                      <Clock size={10} className="mr-1" /> {expiry}
+                                    </Badge>
                                   ) : '—'}
-                                </td>
+                                </TableCell>
                               )}
-
-                              {/* Actions */}
-                              <td style={{ padding: '14px 24px', textAlign: 'right', verticalAlign: 'middle' }}>
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      handleDownload(f);
-                                    }}
-                                    title="Download"
-                                    style={S.btnIcon}
-                                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'}
-                                  >
-                                    <Download size={15} />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      handleDelete(f);
-                                    }}
-                                    title="Delete"
-                                    style={{ ...S.btnIcon, color: '#fca5a5' }}
-                                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'}
-                                  >
-                                    <Trash2 size={15} />
-                                  </button>
+                              <TableCell className="py-3 px-5">
+                                <div className="flex justify-end gap-1">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="neutral" size="icon" className="h-7 w-7 rounded-base"
+                                        onClick={e => { e.stopPropagation(); handleDownload(f); }}>
+                                        <Download size={13} />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Download</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="neutral" size="icon" className="h-7 w-7 rounded-base border-black text-red-700 hover:bg-red-300"
+                                        onClick={e => { e.stopPropagation(); handleDelete(f); }}>
+                                        <Trash2 size={13} />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Delete</TooltipContent>
+                                  </Tooltip>
                                 </div>
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           );
                         })}
-                      </tbody>
-                    </table>
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
 
-                {/* Read More / View All Toggle Footer */}
+                {/* Pagination */}
                 {(hasMoreFiles || showAllFiles) && (
-                  <div style={{ padding: '14px 24px', textAlign: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.12)', background: 'rgba(255, 255, 255, 0.02)' }}>
-                    <button
-                      onClick={() => setShowAllFiles(prev => !prev)}
-                      style={{
-                        background: 'rgba(99, 102, 241, 0.18)',
-                        border: '1px solid rgba(165, 180, 252, 0.35)',
-                        color: '#a5b4fc',
-                        borderRadius: '8px',
-                        padding: '8px 20px',
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.3)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.18)'}
-                    >
+                  <div className="px-5 py-3 border-t-2 border-black text-center">
+                    <Button variant="neutral" className="rounded-base text-sm" onClick={() => setShowAllFiles(p => !p)}>
                       {showAllFiles ? 'Show Less' : `View All (${filteredFiles.length} files)`}
-                    </button>
+                    </Button>
                   </div>
                 )}
-              </div>
+              </Card>
             </div>
           </section>
-        </div>
-      </main>
-    </div>
+        </main>
+
+        {/* ── Confirm Dialog ── */}
+        <Dialog open={confirmModal.isOpen} onOpenChange={open => !open && setConfirmModal(p => ({ ...p, isOpen: false }))}>
+          <DialogContent className="border-4 border-black shadow-[8px_8px_0_0_#000] rounded-base bg-background max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="font-heading text-lg">{confirmModal.title}</DialogTitle>
+              <DialogDescription className="font-base text-sm">{confirmModal.message}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 flex-row justify-end">
+              <Button variant="neutral" className="rounded-base"
+                onClick={() => setConfirmModal(p => ({ ...p, isOpen: false }))}>
+                Cancel
+              </Button>
+              <Button
+                className={`rounded-base ${confirmModal.danger ? 'bg-red-400 hover:bg-red-500 border-black' : ''}`}
+                onClick={confirmModal.onConfirm}>
+                {confirmModal.confirmText}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </TooltipProvider>
   );
 }
