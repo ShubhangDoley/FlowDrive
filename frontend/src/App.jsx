@@ -616,7 +616,7 @@ export default function App() {
               <TooltipTrigger asChild>
                 <a href="https://github.com/ShubhangDoley/FlowDrive" target="_blank" rel="noreferrer">
                   <Button variant="neutral" size="icon" className="rounded-base">
-                    <Github size={16} />
+                    <GithubIcon size={16} />
                   </Button>
                 </a>
               </TooltipTrigger>
@@ -626,10 +626,12 @@ export default function App() {
             <div className="flex items-center gap-2">
               <Avatar className="w-8 h-8 border-2 border-black">
                 <AvatarFallback className="bg-main text-black font-heading text-xs">
-                  {userInitials(user?.username)}
+                  {userInitials(user?.display_name || user?.username || user?.email)}
                 </AvatarFallback>
               </Avatar>
-              <span className="font-base text-sm font-semibold hidden sm:block">{user?.username}</span>
+              <span className="font-base text-sm font-semibold hidden sm:block">
+                {user?.display_name || user?.username || user?.email || 'User'}
+              </span>
             </div>
 
             <Button variant="neutral" size="sm" onClick={handleLogout} className="rounded-base">
