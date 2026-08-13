@@ -1,18 +1,20 @@
 <div align="center">
 
-# 🌌 FlowDrive
+# ⚡ FlowDrive
 
 ### *Bring Your Own Storage — Hybrid Multi-Cloud Storage Platform*
 
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/Frontend-React_19-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
+[![TailwindCSS](https://img.shields.io/badge/Styling-Tailwind_v4-38BDF8?style=for-the-badge&logo=tailwindcss)](https://tailwindcss.com/)
+[![shadcn/ui](https://img.shields.io/badge/UI-Neobrutalism_shadcn-000000?style=for-the-badge)](https://neobrutalism.dev/)
 [![Cloudflare Pages](https://img.shields.io/badge/Deploy-Cloudflare_Pages-F38020?style=for-the-badge&logo=cloudflare)](https://pages.cloudflare.com/)
 [![Render](https://img.shields.io/badge/Deploy-Render_Docker-46E3B7?style=for-the-badge&logo=render)](https://render.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
 ---
 
-**FlowDrive** is a state-of-the-art, open-source multi-cloud storage platform that lets users bring their own cloud storage space (Google Drive & Cloudflare R2) under a single unified, futuristic glassmorphic dashboard.
+**FlowDrive** is a state-of-the-art, open-source multi-cloud storage platform that lets users bring their own cloud storage space (Google Drive & Cloudflare R2) under a unified, high-contrast **Neobrutalism UI dashboard**.
 
 </div>
 
@@ -20,15 +22,16 @@
 
 ## ✨ Features
 
-- 🎨 **Futuristic Glassmorphic Space UI**: Built with dynamic WebGL 3D Prism Shaders (OGL), glowing specular cards, and a clean 50/50 split dashboard layout.
+- 🎨 **Neobrutalism Design System**: Built using `shadcn/ui` Neobrutalism components — bold 4px black borders, drop shadows (`4px 4px 0 #000`), hover-shift interactions, and high-contrast typography (`Space Grotesk` & `Inter`).
 - 🔑 **Multi-Account Google Drive Linking**: Connect multiple Google Drive accounts to a single FlowDrive user profile. Switch default target drives with a single click.
 - 🛡️ **Zero Data Lock-in**: All permanent files live directly in your personal Google Drive inside a dedicated `FlowDrive` folder.
 - ⏱️ **Temporary Auto-Expiring Storage**: Store temporary files (1 hour, 24 hours, or 7 days) powered by Cloudflare R2 with automatic background cleanup schedules.
+- 🚀 **Parallel Upload Pool**: Up to 5x multi-threaded parallel file uploads with live progress tracking and instant user cancellation support.
 - 🔒 **Enterprise-Grade Security**:
   - SHA-256 + Bcrypt password hashing for local accounts.
-  - Signed cryptographic state tokens (`itsdangerous`) for OAuth 2.0 PKCE flow.
-  - Fernet symmetric encryption (AES-128-CBC) for storing OAuth refresh tokens securely in database.
-  - SameSite=None + Secure cross-site session cookies.
+  - Signed cryptographic state tokens (`itsdangerous`) carrying PKCE `code_verifier` for OAuth 2.0.
+  - SHA-256 derived Fernet symmetric encryption (AES-128-CBC) for storing Google OAuth refresh tokens securely.
+  - `SameSite=None; Secure` cross-site ASGI session cookies.
 
 ---
 
@@ -36,13 +39,13 @@
 
 ### **Frontend**
 - **Framework**: React 19 + Vite
-- **Styling**: Tailwind CSS v4 + Vanilla CSS Design Tokens
-- **Visual Effects**: OGL WebGL 3D Prism Shader (`Prism.jsx`)
-- **Icons**: Lucide React
+- **UI & Components**: Neobrutalism UI (`shadcn/ui` primitive set)
+- **Styling**: Tailwind CSS v4 + CSS Design Tokens
+- **Icons & Notifications**: Lucide React + Sonner Toasts
 
 ### **Backend**
 - **Framework**: FastAPI (Python 3.11)
-- **Database ORM**: SQLAlchemy 2.0 (Dialect-agnostic: SQLite & PostgreSQL compatible)
+- **Database ORM**: SQLAlchemy 2.0 (SQLite & PostgreSQL compatible)
 - **Security & Encryption**: Cryptography (Fernet), PyCryptodome, Bcrypt, ItsDangerous
 - **Background Tasks**: APScheduler (Automated temporary file cleanup)
 - **Logging**: Structlog + JSON-formatted unbuffered standard output
@@ -202,6 +205,3 @@ FlowDrive API (/api/v1)
 ## 📄 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
-
----
-
