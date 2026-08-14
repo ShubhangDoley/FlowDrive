@@ -116,10 +116,79 @@ function QueueStatusBadge({ status }) {
   return <Badge className={`text-xs font-bold ${className}`}>{label}</Badge>;
 }
 
+// ─── Demo Mode Seed Data ──────────────────────────────────────────────────────
+const DEMO_USER = {
+  id: 'demo-user-id',
+  username: 'demo_user',
+  email: 'demo@flowdrive.io',
+  display_name: 'Demo Visitor',
+  is_demo: true,
+  has_drive_connected: true,
+};
+
+const DEMO_DRIVE_ACCOUNTS = [
+  {
+    id: 'demo-drive-1',
+    account_email: 'work.drive@gmail.com',
+    is_default: true,
+    storage: { used_bytes: 8589934592, limit_bytes: 16106127360, usage_pct: 53.3 },
+  },
+  {
+    id: 'demo-drive-2',
+    account_email: 'personal.drive@gmail.com',
+    is_default: false,
+    storage: { used_bytes: 4294967296, limit_bytes: 16106127360, usage_pct: 26.7 },
+  },
+];
+
+const DEMO_FILES = [
+  {
+    id: 'demo-f-1',
+    filename: 'Q3_Financial_Report.pdf',
+    provider: 'google_drive',
+    drive_account_email: 'work.drive@gmail.com',
+    created_at: new Date().toISOString(),
+    size_bytes: 4521984,
+  },
+  {
+    id: 'demo-f-2',
+    filename: 'FlowDrive_Architecture_Diagram.png',
+    provider: 'google_drive',
+    drive_account_email: 'work.drive@gmail.com',
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+    size_bytes: 2840576,
+  },
+  {
+    id: 'demo-f-3',
+    filename: 'Project_Backup_2026.zip',
+    provider: 'google_drive',
+    drive_account_email: 'personal.drive@gmail.com',
+    created_at: new Date(Date.now() - 172800000).toISOString(),
+    size_bytes: 104857600,
+  },
+  {
+    id: 'demo-f-4',
+    filename: 'Temporary_Share_Asset.mp4',
+    provider: 'cloudflare_r2',
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 3600000 * 18).toISOString(),
+    size_bytes: 52428800,
+  },
+  {
+    id: 'demo-f-5',
+    filename: 'Temporary_Design_Mockups.fig',
+    provider: 'cloudflare_r2',
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 3600000 * 2).toISOString(),
+    size_bytes: 12582912,
+  },
+];
+
 // ─── App root ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [authState, setAuthState] = useState('loading');
   const [user,      setUser]      = useState(null);
+  const [isDemo,    setIsDemo]    = useState(false);
 
   // Auth form state
   const [siUser,     setSiUser]     = useState('');
@@ -142,6 +211,16 @@ export default function App() {
   const [selectedDriveAccountId, setSelectedDriveAccountId] = useState(null);
   const [driveError,             setDriveError]             = useState(null);
   const [showAllDrives,          setShowAllDrives]          = useState(false);
+
+  function enterDemoMode() {
+    setIsDemo(true);
+    setUser(DEMO_USER);
+    setDriveAccounts(DEMO_DRIVE_ACCOUNTS);
+    setSelectedDriveAccountId('demo-drive-1');
+    setFiles(DEMO_FILES);
+    setAuthState('authenticated');
+    toast.success('Welcome to FlowDrive Demo Mode!');
+  }
 
   // Upload state
   const [uploadIntent,   setUploadIntent]   = useState('permanent');
@@ -197,15 +276,15 @@ export default function App() {
   }, []);
 
   const fetchFiles = useCallback(async () => {
-    if (authState !== 'authenticated') return;
+    if (isDemo || authState !== 'authenticated') return;
     try {
       const res = await API.get('/api/v1/files');
       if (res.ok) { const data = await res.json(); setFiles(data.files ?? []); }
     } catch (e) { console.error('Failed to fetch files', e); }
-  }, [authState]);
+  }, [authState, isDemo]);
 
   const fetchDriveAccounts = useCallback(async () => {
-    if (authState !== 'authenticated') return;
+    if (isDemo || authState !== 'authenticated') return;
     setDriveAccountsLoading(true); setDriveError(null);
     try {
       const res = await API.get('/api/v1/drive/accounts');
@@ -218,7 +297,7 @@ export default function App() {
       }
     } catch (e) { console.error('Failed to fetch drive accounts', e); }
     finally { setDriveAccountsLoading(false); }
-  }, [authState]);
+  }, [authState, isDemo]);
 
   useEffect(() => {
     if (authState === 'authenticated') { fetchFiles(); fetchDriveAccounts(); }
@@ -340,6 +419,13 @@ export default function App() {
       title: 'Log Out', message: 'Are you sure you want to log out of FlowDrive?',
       confirmText: 'Log Out', danger: true,
       onConfirm: async () => {
+        if (isDemo) {
+          setIsDemo(false);
+          setAuthState('unauthenticated');
+          setUser(null);
+          toast.success('Exited Demo Mode');
+          return;
+        }
         try { await API.post('/api/v1/auth/logout', {}); setAuthState('unauthenticated'); setUser(null); toast.success('Logged out successfully'); }
         catch (e) { toast.error('Failed to log out. Please try again.'); }
       }
@@ -354,6 +440,11 @@ export default function App() {
       message: `Delete "${file.filename}" from ${isDrive ? 'Google Drive' : 'temporary storage'}? This cannot be undone.`,
       confirmText: 'Delete File', danger: true,
       onConfirm: async () => {
+        if (isDemo) {
+          setFiles(prev => prev.filter(f => f.id !== file.id));
+          toast.success(`"${file.filename}" deleted (demo mode)`);
+          return;
+        }
         try {
           const res = await API.delete(`/api/v1/files/${file.id}`);
           if (res.ok || res.status === 204) {
@@ -371,10 +462,20 @@ export default function App() {
 
   function handleDownload(file) {
     if (!file || !file.id) return;
+    if (isDemo) {
+      toast.info(`Simulated download for "${file.filename}" (demo mode)`);
+      return;
+    }
     window.open(getUrl(`/api/v1/files/${file.id}/download`), '_blank');
   }
 
   async function handleSetDefaultDrive(accountId) {
+    if (isDemo) {
+      setDriveAccounts(prev => prev.map(a => ({ ...a, is_default: a.id === accountId })));
+      setSelectedDriveAccountId(accountId);
+      toast.success('Default Google Drive updated (demo mode)');
+      return;
+    }
     setDriveError(null);
     try {
       const res = await API.patch(`/api/v1/drive/accounts/${accountId}/default`, {});
@@ -388,6 +489,11 @@ export default function App() {
       title: 'Disconnect Drive', message: `Disconnect Google account (${account.account_email})?`,
       confirmText: 'Disconnect', danger: true,
       onConfirm: async () => {
+        if (isDemo) {
+          setDriveAccounts(prev => prev.filter(a => a.id !== account.id));
+          toast.success(`Disconnected ${account.account_email} (demo mode)`);
+          return;
+        }
         try {
           const res = await API.delete(`/api/v1/drive/accounts/${account.id}`);
           if (res.ok) { toast.success(`Disconnected ${account.account_email}`); fetchDriveAccounts(); }
@@ -398,6 +504,10 @@ export default function App() {
   }
 
   async function handleGoogleConnect() {
+    if (isDemo) {
+      toast.info('You are in Demo Mode! Sign out and log in with a real account to connect Google Drive.');
+      return;
+    }
     try {
       const res = await API.get('/api/v1/auth/google/connect-url');
       if (res.ok) { const data = await res.json(); if (data?.url) { window.location.href = data.url; return; } }
@@ -542,6 +652,15 @@ export default function App() {
                     </form>
                   </TabsContent>
                 </Tabs>
+
+                <div className="relative my-4 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t-2 border-black"></div></div>
+                  <span className="relative bg-background px-3 font-heading text-xs uppercase opacity-70">or</span>
+                </div>
+
+                <Button variant="neutral" className="w-full bg-yellow-300 hover:bg-yellow-400 font-heading text-black border-2 border-black shadow-shadow" onClick={enterDemoMode}>
+                  <Zap size={16} /> Explore Instant Demo
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -608,6 +727,11 @@ export default function App() {
               <Orbit size={16} />
             </div>
             <span className="font-heading text-xl">FlowDrive</span>
+            {isDemo && (
+              <Badge className="border-2 border-black bg-yellow-300 text-black font-heading text-[10px] shadow-shadow">
+                DEMO PREVIEW
+              </Badge>
+            )}
           </div>
 
           {/* Right */}
