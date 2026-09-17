@@ -23,6 +23,7 @@ from app.middleware.request_id import RequestIDMiddleware
 from app.routes.auth import router as auth_router
 from app.routes.files import router as files_router
 from app.routes.drive import router as drive_router
+from app.routes.cron import router as cron_router
 from app.services.cleanup_service import run_cleanup
 
 settings = get_settings()
@@ -99,6 +100,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(files_router)
     app.include_router(drive_router)
+    app.include_router(cron_router)
 
     # ── Health check ───────────────────────────────────────────────────────────
     @app.get("/health", tags=["ops"], summary="Health check")
@@ -111,15 +113,17 @@ def create_app() -> FastAPI:
         }
 
     # ── APScheduler — cleanup expired temp files ───────────────────────────────
+    is_vercel = os.getenv("VERCEL") == "1"
     scheduler = BackgroundScheduler()
-    scheduler.add_job(
-        run_cleanup,
-        trigger="interval",
-        minutes=settings.temp_cleanup_interval_minutes,
-        id="cleanup_expired_files",
-        replace_existing=True,
-        max_instances=1,
-    )
+    if not is_vercel:
+        scheduler.add_job(
+            run_cleanup,
+            trigger="interval",
+            minutes=settings.temp_cleanup_interval_minutes,
+            id="cleanup_expired_files",
+            replace_existing=True,
+            max_instances=1,
+        )
 
     @app.on_event("startup")
     def start_scheduler():
@@ -129,16 +133,20 @@ def create_app() -> FastAPI:
         Base.metadata.create_all(bind=engine)
         logger.info("database_tables_created")
 
-        scheduler.start()
-        logger.info(
-            "scheduler_started",
-            interval_minutes=settings.temp_cleanup_interval_minutes,
-        )
+        if not is_vercel:
+            scheduler.start()
+            logger.info(
+                "scheduler_started",
+                interval_minutes=settings.temp_cleanup_interval_minutes,
+            )
+        else:
+            logger.info("scheduler_skipped_on_vercel")
 
     @app.on_event("shutdown")
     def stop_scheduler():
-        scheduler.shutdown(wait=False)
-        logger.info("scheduler_stopped")
+        if not is_vercel and scheduler.running:
+            scheduler.shutdown(wait=False)
+            logger.info("scheduler_stopped")
 
     logger.info(
         "app_created",

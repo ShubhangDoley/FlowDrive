@@ -12,14 +12,22 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-engine = create_engine(
-    settings.database_url,
-    pool_pre_ping=True,        # verify connection before use
-    pool_size=20,              # increased capacity for concurrent uploads
-    max_overflow=30,           # allow temporary overflow under high load
-    pool_timeout=10,           # fast fail instead of hanging forever
-    echo=not settings.is_production,  # log SQL in dev, silent in prod
-)
+db_url = settings.database_url
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+engine_kwargs = {
+    "pool_pre_ping": True,
+    "echo": not settings.is_production,
+}
+if not db_url.startswith("sqlite"):
+    engine_kwargs.update({
+        "pool_size": 20,
+        "max_overflow": 30,
+        "pool_timeout": 10,
+    })
+
+engine = create_engine(db_url, **engine_kwargs)
 
 SessionLocal = sessionmaker(
     bind=engine,
