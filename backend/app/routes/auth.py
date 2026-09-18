@@ -42,7 +42,9 @@ def register(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
 
     request.session["user_id"] = str(user.id)
-    return auth_service.get_me(db, user)
+    me = auth_service.get_me(db, user)
+    me.session_token = _generate_session_token(dict(request.session))
+    return me
 
 
 @router.post("/login", response_model=UserMe, summary="Login with username + password")
@@ -66,7 +68,10 @@ def local_login(
         )
 
     request.session["user_id"] = str(user.id)
-    return auth_service.get_me(db, user)
+    me = auth_service.get_me(db, user)
+    me.session_token = _generate_session_token(dict(request.session))
+    return me
+
 
 
 # ── Google OAuth ──────────────────────────────────────────────────────────────
@@ -175,12 +180,21 @@ def google_callback(
             status_code=status.HTTP_302_FOUND,
         )
 
+def _generate_session_token(session_dict: dict) -> str:
+    from itsdangerous import URLSafeTimedSerializer
+    settings = get_settings()
+    serializer = URLSafeTimedSerializer(settings.session_secret, salt="cookie-session")
+    return serializer.dumps(session_dict)
+
+
     request.session["user_id"] = str(user.id)
     logger.info("user_logged_in", user_id=str(user.id), email=user.email)
+    token = _generate_session_token(dict(request.session))
     return RedirectResponse(
-        url=f"{settings.effective_frontend_url}/",
+        url=f"{settings.effective_frontend_url}/?session_token={token}",
         status_code=status.HTTP_302_FOUND,
     )
+
 
 
 @router.post("/logout", summary="Log out the current user")
@@ -194,8 +208,12 @@ def logout(request: Request):
 
 @router.get("/me", response_model=UserMe, summary="Get current user info")
 def get_me(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Return the authenticated user's profile and Drive connection status."""
-    return auth_service.get_me(db, current_user)
+    me = auth_service.get_me(db, current_user)
+    me.session_token = _generate_session_token(dict(request.session))
+    return me
+

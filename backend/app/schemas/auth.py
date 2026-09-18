@@ -29,6 +29,8 @@ class UserMe(UserRead):
     """Extended user info returned only on GET /auth/me (includes timestamps)."""
 
     created_at: datetime
+    session_token: str | None = None
+
 
 
 class RegisterRequest(BaseModel):

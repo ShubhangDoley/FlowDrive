@@ -32,15 +32,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://flowdrive-backend-2.onrender.com').replace(/\/$/, '');
 const getUrl = (path) => path.startsWith('http') ? path : `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
 
+const getAuthHeaders = (extraHeaders = {}) => {
+  const token = localStorage.getItem('flowdrive_token');
+  return {
+    ...extraHeaders,
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+  };
+};
+
 const API = {
-  get:      (path)           => fetch(getUrl(path), { credentials: 'include' }),
-  post:     (path, body)     => fetch(getUrl(path), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-  postForm: (path, formData) => fetch(getUrl(path), { method: 'POST', credentials: 'include', body: formData }),
+  get:      (path)           => fetch(getUrl(path), { credentials: 'include', headers: getAuthHeaders() }),
+  post:     (path, body)     => fetch(getUrl(path), { method: 'POST', credentials: 'include', headers: getAuthHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) }),
+  postForm: (path, formData) => fetch(getUrl(path), { method: 'POST', credentials: 'include', headers: getAuthHeaders(), body: formData }),
   postFormWithProgress: (path, formData, onProgress, onRegisterAbort) => {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', getUrl(path));
       xhr.withCredentials = true;
+      const token = localStorage.getItem('flowdrive_token');
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       if (onRegisterAbort) onRegisterAbort(() => xhr.abort());
       if (xhr.upload && onProgress) {
         xhr.upload.onprogress = (event) => {
@@ -60,9 +70,10 @@ const API = {
       xhr.send(formData);
     });
   },
-  patch:    (path, body)     => fetch(getUrl(path), { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-  delete:   (path)           => fetch(getUrl(path), { method: 'DELETE', credentials: 'include' }),
+  patch:    (path, body)     => fetch(getUrl(path), { method: 'PATCH', credentials: 'include', headers: getAuthHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) }),
+  delete:   (path)           => fetch(getUrl(path), { method: 'DELETE', credentials: 'include', headers: getAuthHeaders() }),
 };
+
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────
 function fmtBytes(bytes) {
@@ -254,10 +265,22 @@ export default function App() {
 
   // ─── Auth check on mount ──────────────────────────────────────────────────
   useEffect(() => {
+    if (window.location.search) {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('session_token')) {
+        const token = urlParams.get('session_token');
+        if (token) localStorage.setItem('flowdrive_token', token);
+        urlParams.delete('session_token');
+        const newSearch = urlParams.toString();
+        window.history.replaceState({}, '', window.location.pathname + (newSearch ? `?${newSearch}` : ''));
+      }
+    }
+
     API.get('/api/v1/auth/me')
       .then(async (res) => {
         if (res.ok) {
           const userData = await res.json();
+          if (userData.session_token) localStorage.setItem('flowdrive_token', userData.session_token);
           setUser(userData);
           if (userData.has_drive_connected) setAuthState('authenticated');
           else setAuthState('needs_drive');
@@ -304,10 +327,12 @@ export default function App() {
   }, [authState, fetchFiles, fetchDriveAccounts]);
 
   const onAuth = (userData) => {
+    if (userData.session_token) localStorage.setItem('flowdrive_token', userData.session_token);
     setUser(userData);
     if (userData.has_drive_connected) setAuthState('authenticated');
     else setAuthState('needs_drive');
   };
+
 
   // ─── Parallel Worker Pool Queue Processor ────────────────────────────────
   const processQueue = useCallback(async () => {
@@ -426,11 +451,18 @@ export default function App() {
           toast.success('Exited Demo Mode');
           return;
         }
-        try { await API.post('/api/v1/auth/logout', {}); setAuthState('unauthenticated'); setUser(null); toast.success('Logged out successfully'); }
+        try {
+          await API.post('/api/v1/auth/logout', {});
+          localStorage.removeItem('flowdrive_token');
+          setAuthState('unauthenticated');
+          setUser(null);
+          toast.success('Logged out successfully');
+        }
         catch (e) { toast.error('Failed to log out. Please try again.'); }
       }
     });
   }
+
 
   function handleDelete(file) {
     if (!file || !file.id) return;

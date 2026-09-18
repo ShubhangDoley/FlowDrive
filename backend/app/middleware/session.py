@@ -38,21 +38,28 @@ class PureASGISessionMiddleware:
 
         headers_dict = dict(scope.get("headers", []))
         cookie_header = headers_dict.get(b"cookie", b"").decode("utf-8")
+        auth_header = headers_dict.get(b"authorization", b"").decode("utf-8")
 
         session_data = {}
         cookie_val = None
-        for cookie in cookie_header.split(";"):
-            if "=" in cookie:
-                k, v = cookie.strip().split("=", 1)
-                if k == self.session_cookie:
-                    cookie_val = v
-                    break
+
+        if auth_header.startswith("Bearer "):
+            cookie_val = auth_header[7:].strip()
+
+        if not cookie_val and cookie_header:
+            for cookie in cookie_header.split(";"):
+                if "=" in cookie:
+                    k, v = cookie.strip().split("=", 1)
+                    if k == self.session_cookie:
+                        cookie_val = v
+                        break
 
         if cookie_val:
             try:
                 session_data = self.serializer.loads(cookie_val, max_age=self.max_age)
             except Exception:
                 session_data = {}
+
 
         scope["session"] = session_data
 
