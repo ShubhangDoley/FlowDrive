@@ -21,6 +21,14 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
+def _generate_session_token(session_dict: dict) -> str:
+    from itsdangerous import URLSafeTimedSerializer
+    settings = get_settings()
+    serializer = URLSafeTimedSerializer(settings.session_secret, salt="cookie-session")
+    return serializer.dumps(session_dict)
+
+
+
 # ── Local auth ────────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=UserMe, status_code=status.HTTP_201_CREATED,
@@ -180,13 +188,6 @@ def google_callback(
             status_code=status.HTTP_302_FOUND,
         )
 
-def _generate_session_token(session_dict: dict) -> str:
-    from itsdangerous import URLSafeTimedSerializer
-    settings = get_settings()
-    serializer = URLSafeTimedSerializer(settings.session_secret, salt="cookie-session")
-    return serializer.dumps(session_dict)
-
-
     request.session["user_id"] = str(user.id)
     logger.info("user_logged_in", user_id=str(user.id), email=user.email)
     token = _generate_session_token(dict(request.session))
@@ -194,6 +195,7 @@ def _generate_session_token(session_dict: dict) -> str:
         url=f"{settings.effective_frontend_url}/?session_token={token}",
         status_code=status.HTTP_302_FOUND,
     )
+
 
 
 
