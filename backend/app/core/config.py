@@ -73,7 +73,11 @@ class Settings(BaseSettings):
                 vercel_url = f"https://{vercel_url}"
             return f"{vercel_url}/api/v1/auth/google/callback"
 
+        if self.is_production or os.getenv("VERCEL") == "1":
+            return "https://flow-drive-backend.vercel.app/api/v1/auth/google/callback"
+
         return self.google_oauth_redirect_uri or "http://localhost:8000/api/v1/auth/google/callback"
+
 
 
 
