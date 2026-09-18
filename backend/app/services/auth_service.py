@@ -122,7 +122,8 @@ def handle_callback(
         code_verifier = session.pop("oauth_code_verifier", None)
 
     if not attach_to_user_id:
-        attach_to_user_id = user_id_from_state or session.pop("connecting_drive_for", None)
+        attach_to_user_id = user_id_from_state or session.pop("connecting_drive_for", None) or session.get("user_id")
+
 
     # 2. Exchange code for tokens (passing code_verifier)
     flow = _build_flow()
