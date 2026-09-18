@@ -3,9 +3,11 @@ Centralised configuration — all env-var access goes through `get_settings()`.
 Never call os.getenv() directly outside this module.
 """
 
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 
 class Settings(BaseSettings):
@@ -61,9 +63,18 @@ class Settings(BaseSettings):
 
     @property
     def effective_google_redirect_uri(self) -> str:
-        if self.google_oauth_redirect_uri:
+        if self.google_oauth_redirect_uri and "localhost" not in self.google_oauth_redirect_uri:
             return self.google_oauth_redirect_uri
-        return "http://localhost:8000/api/v1/auth/google/callback"
+
+        vercel_url = os.getenv("VERCEL_PROJECT_PRODUCTION_URL") or os.getenv("VERCEL_URL")
+        if vercel_url:
+            vercel_url = vercel_url.rstrip("/")
+            if not vercel_url.startswith("http://") and not vercel_url.startswith("https://"):
+                vercel_url = f"https://{vercel_url}"
+            return f"{vercel_url}/api/v1/auth/google/callback"
+
+        return self.google_oauth_redirect_uri or "http://localhost:8000/api/v1/auth/google/callback"
+
 
 
     @property
