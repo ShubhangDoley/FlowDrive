@@ -152,11 +152,11 @@ def handle_callback(
     avatar_url = id_info.get("picture")
 
     # 4. Find or attach user
+    user = None
     if attach_to_user_id:
         user = user_repo.get_by_id(db, attach_to_user_id)
-        if user is None:
-            raise ValueError("User not found for drive connect.")
-    else:
+    
+    if user is None:
         user = user_repo.upsert(
             db,
             google_sub=google_sub,
@@ -164,6 +164,7 @@ def handle_callback(
             display_name=display_name,
             avatar_url=avatar_url,
         )
+
 
     # Update basic profile attributes if missing
     if not user.email and email:
